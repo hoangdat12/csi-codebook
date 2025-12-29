@@ -30,7 +30,7 @@ i1 = { i11, i12, i13, i14 }
 
 ### 2.1 i11 – Beam index theo chiều N1
 
-**Ký hiệu trong spec**: ( i_{1,1} )
+**Ký hiệu trong spec**: $$i_{1,1}$$
 
 **Miền giá trị**:
 
@@ -44,9 +44,7 @@ i1 = { i11, i12, i13, i14 }
 * Dùng để tạo chỉ số beam m1
 
 **Công thức liên quan**:
-[
-m_1 = O_1 \cdot n_1 + q_1
-]
+$$m_1^{(i)} = O_1 n_1^{(i)} + q_1$$
 
 **Lưu ý**:
 
@@ -57,13 +55,11 @@ m_1 = O_1 \cdot n_1 + q_1
 
 ### 2.2 i12 – Beam index theo chiều N2
 
-**Ký hiệu trong spec**: ( i_{1,2} )
+**Ký hiệu trong spec**: $$i_{1,2}$$
 
 **Miền giá trị**:
 
-```text
-0 … O2 − 1
-```
+$$i_{1,2} \in \{0, 1, \dots, \binom{N_1 N_2}{L} - 1\}$$
 
 **Ý nghĩa**:
 
@@ -71,15 +67,13 @@ m_1 = O_1 \cdot n_1 + q_1
 * Dùng để tạo chỉ số beam m2
 
 **Công thức**:
-[
-m_2 = O_2 \cdot n_2 + q_2
-]
+$$m_2^{(i)} = O_2 n_2^{(i)} + q_2$$
 
 ---
 
 ### 2.3 i13 – Strongest coefficient index
 
-**Ký hiệu trong spec**: ( i_{1,3,l} )
+**Ký hiệu trong spec**: $$i_{1,3}$$
 
 **Miền giá trị**:
 
@@ -100,7 +94,7 @@ m_2 = O_2 \cdot n_2 + q_2
 
 ### 2.4 i14 – Amplitude coefficient indices
 
-**Ký hiệu trong spec**: ( i_{1,4,l}^{(1)} )
+**Ký hiệu trong spec**: $$i_{1,4}$$
 
 **Miền giá trị**:
 
@@ -156,49 +150,35 @@ i2 = { i21, i22 }
 * Quy định pha của mỗi coefficient
 
 **Công thức pha**:
-[
-\phi = \frac{2\pi}{N_{PSK}} \cdot c
-]
+$$\phi = \frac{2\pi}{N_{PSK}} \cdot c$$
 
 **Lưu ý**:
 
 * Strongest coefficient **không có phase** (mặc định 0)
 * UE báo cáo PMI cho GNB.
 - Số lượng phần tử:  
-  \[
-  \min(M_l, K^{(2)}) - 1
-  \]
+$$\min(M_l, K^{(2)}) - 1$$
 - Các phần tử trong nhóm này được báo cáo với **độ phân giải đầy đủ**.
 - Miền giá trị của hệ số:
-  \[
-  c_{l,i} \in \{0, 1, \dots, N_{PSK} - 1\}
-  \]
+$$c_{l,i} \in \{0, 1, \dots, N_{PSK} - 1\}$$
 
 - Số lượng phần tử:
-  \[
-  M_l - \min(M_l, K^{(2)})
-  \]
+$$M_l - \min(M_l, K^{(2)})$$
+
 - Các phần tử này chỉ được báo cáo với **độ phân giải thấp hơn** nhằm giảm overhead phản hồi.
 - Miền giá trị của hệ số:
-  \[
-  c_{l,i} \in \{0, 1, 2, 3\}
-  \]
+$$c_{l,i} \in \{0, 1, 2, 3\}$$
 
 - Số lượng phần tử:
-  \[
-  2L - M_l
-  \]
+$$2L - M_l$$
+
 - Các phần tử này **không được UE báo cáo**.
 - Tại phía gNB, các hệ số này được mặc định:
-  \[
-  c_{l,i} = 0
-  \]
+$$c_{l,i} = 0$$
 
 ---
 
 ### 3.2 i22 – Subband amplitude indices
-
-**Ký hiệu trong spec**: ( i_{2,2,l}^{(2)} )
 
 **Điều kiện tồn tại**:
 
@@ -221,9 +201,7 @@ subbandAmplitude = true
 * Map theo **Table 5.2.2.2.3-3**
 
 **Amplitude cuối**:
-[
-a = p^{(1)} \times p^{(2)}
-]
+$$a = p^{(1)} \cdot p^{(2)}$$
 
 **Lưu ý**:
 
@@ -232,26 +210,19 @@ a = p^{(1)} \times p^{(2)}
 Đối với mỗi lớp \(l\), các chỉ số nhị phân \(k_{l,i}^{(2)}\) được báo cáo theo nguyên tắc sau:
 
 - Chỉ báo cáo:
-  \[
-  \min(M_l, K^{(2)}) - 1
-  \]
+$$\min(M_l, K^{(2)}) - 1$$
   phần tử.
-- Các phần tử này tương ứng với **các hệ số mạnh nhất**, **ngoại trừ hệ số mạnh nhất tuyệt đối** có chỉ số \(i_{1,3,l}\).
+- Các phần tử này tương ứng với **các hệ số mạnh nhất**, **ngoại trừ hệ số mạnh nhất tuyệt đối** có chỉ số $$i_{1,3,l}$$.
 
 - Các phần tử được báo cáo có miền giá trị nhị phân:
-  \[
-  k_{l,i}^{(2)} \in \{0, 1\}
-  \]
+$$k_{l,i}^{(2)} \in \{0, 1\}$$
 
 - Số lượng phần tử không được báo cáo:
-  \[
-  2L - \min(M_l, K^{(2)})
-  \]
+$$2L - \min(M_l, K^{(2)})$$
+
 - Các phần tử này **không được UE báo cáo**.
 - Tại phía gNB, các giá trị này được mặc định:
-  \[
-  k_{l,i}^{(2)} = 1
-  \]
+$$k_{l,i}^{(2)} = 1$$
 
 ---
 
@@ -270,11 +241,11 @@ UE **không báo trực tiếp** n1, n2
 ### 4.2 m1, m2 – Beam indices thực
 
 **Công thức**:
-$$m_1 = O_1 n_1 + q_1$$
-$$m_2 = O_2 n_2 + q_2$$
+* $$m_1 = O_1 n_1 + q_1$$
+* $$m_2 = O_2 n_2 + q_2$$
 
 Dùng để sinh vector beam:
-$$u_{m_1,m_2}(n_1,n_2)$$
+* $$u_{m_1,m_2}(n_1,n_2)$$
 
 ---
 
@@ -284,30 +255,11 @@ $$u_{m_1,m_2}(n_1,n_2)$$
 * p2: từ i22 (Table 3-3)
 
 **Amplitude cuối**:
-[
-a = p_1 \cdot p_2
-]
+$$a = p_1 \cdot p_2$$
 
 ---
 
-## 5. Tổng hợp precoding matrix W
-
-Với RI = ν:
-
-[
-W = \begin{bmatrix}
-w_1 & w_2 & \dots & w_\nu
-\end{bmatrix}
-]
-
-Mỗi cột:
-[
-w_l = \sum_i a_{l,i} e^{j\phi_{l,i}} u_{m_1,m_2}
-]
-
----
-
-## 6. Bảng tóm tắt nhanh
+## 5. Bảng tóm tắt nhanh
 
 | Tham số | UE report | Ý nghĩa               |
 | ------- | --------- | --------------------- |
