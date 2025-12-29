@@ -274,8 +274,166 @@ $$a = p_1 \cdot p_2$$
 | p1, p2  | ✘         | Amplitude thực        |
 
 ---
+## 6. UE input parameters (Type II Codebook)
 
-## 7. Tài liệu tham chiếu
+* Ví dụ tập tham số CSI do UE báo cáo cho Codebook Type II:
+
+```matlab
+L = 4;          % Number of layers
+NPsk = 8;       % PSK order for coefficient phase
+
+N1 = 4; N2 = 4; % Antenna grid size
+O1 = 4; O2 = 4; % Oversampling factors
+
+% i1: Beam / basis indices
+i11 = [2, 1];   % Beam index (dimension 1)
+i12 = [2];      % Beam index (dimension 2)
+i13 = [3, 1];   % Additional beam refinement indices
+i14 = [ ...
+  4, 6, 5, 0, 2, 3, 1;
+  3, 2, 4, 1, 5, 6, 0
+];
+
+% i2: Coefficient indices
+i21 = [ ...
+  1, 3, 4, 2, 5, 7;
+  2, 0, 5, 1, 4, 6
+];               % Phase indices (0 … NPsk−1)
+
+i22 = [ ...
+  0, 1, 0, 1, 0;
+  1, 1, 0, 0, 1
+];               % Amplitude / group indices
+
+i1 = {i11, i12, i13, i14};
+i2 = {i21, i22};
+```
+
+---
+## 7. Cách dùng các hàm
+
+### validateInputs
+**Mô tả**  
+Kiểm tra tính hợp lệ của các tham số CSI do UE báo cáo.
+
+**Input**
+- `nLayers`: số layer truyền
+- `sbAmplitude`: cấu hình biên độ theo subband
+- `i1`: tập chỉ số beam `{i11, i12, i13, i14}`
+- `i2`: tập chỉ số hệ số `{i21, i22}`
+
+**Output**
+- Không có (chỉ thực hiện kiểm tra)
+
+---
+
+### computeInputs
+**Mô tả**  
+Lấy các input **i11, i12, i13, i14, i21, i22** và format chuẩn để xử lý.
+
+**Input**
+- `L`: số layer
+- `i1`: các chỉ số beam
+- `i2`: các chỉ số hệ số
+
+**Output**
+- `i11`: chỉ số beam theo chiều N1
+- `i12`: chỉ số beam theo chiều N2
+- `i14`: các chỉ số beam bổ sung
+- `i21`: chỉ số pha
+- `i22`: chỉ số nhóm biên độ
+
+**Example**
+
+_Input_
+```matlab
+cfg = struct();
+
+cfg.CodebookConfig.N1 = 4;
+cfg.CodebookConfig.N2 = 4;
+cfg.CodebookConfig.O1 = 4;
+cfg.CodebookConfig.O2 = 4;
+
+cfg.CodebookConfig.NumberOfBeams = 4;     % L
+cfg.CodebookConfig.PhaseAlphabetSize = 8; % NPSK
+cfg.CodebookConfig.SubbandAmplitude = true;
+cfg.CodebookConfig.numLayers = 2;         % nLayers
+
+i11 = [2, 1];
+i12 = [2];
+i13 = [3, 1];
+i14 = [4, 6, 5, 0, 2, 3, 1 ; 3, 2, 4, 1, 5, 6, 0];
+i21 = [1, 3, 4, 2, 5, 7 ; 2, 0, 5, 1, 4, 6];
+i22 = [0, 1, 0, 1, 0 ; 1, 1, 0, 0, 1];
+
+i1 = {i11, i12, i13, i14};
+i2 = {i21, i22};
+```
+
+_Output_
+```matlab
+i11 = [2, 1]
+
+i12 = [2]
+
+i13 = 3
+
+i14 = [4, 6, 5, 7, 0, 2, 3, 1;
+       3, 7, 2, 4, 1, 5, 6, 0]
+
+i21 = [1, 3, 4, 0, 0, 2, 5, 7;
+       2, 0, 0, 5, 1, 4, 6, 0]
+
+i22 = [0, 0, 1, 1, 1, 0, 1, 1;
+       0, 1, 1, 0, 1, 1, 1, 1]
+```
+
+---
+
+### computeN1N2
+**Mô tả**  
+Tính các chỉ số beam theo lưới anten.
+
+**Input**
+- `L`: số layer
+- `N1`, `N2`: kích thước lưới anten
+- `i12`: chỉ số beam theo chiều N2
+
+**Output**
+- `n1`: chỉ số beam theo chiều N1
+- `n2`: chỉ số beam theo chiều N2
+
+---
+
+### mappingAmplitudesK1K2ToP1P2
+**Mô tả**  
+Ánh xạ chỉ số biên độ sang hệ số biên độ.
+
+**Input**
+- `i14`: chỉ số tổ hợp beam
+- `i22`: chỉ số nhóm biên độ
+
+**Output**
+- `p1_li`: hệ số biên độ nhóm 1
+- `p2_li`: hệ số biên độ nhóm 2
+
+---
+
+### computePhi
+**Mô tả**  
+Tính giá trị pha cho các hệ số precoding.
+
+**Input**
+- `i14`: chỉ số beam
+- `i21`: chỉ số pha
+- `L`: số layer
+- `NPSK`: bậc PSK
+
+**Output**
+- `phi`: ma trận pha của các hệ số precoding
+
+---
+## 8. Tài liệu tham chiếu
 
 * 3GPP TS 38.214
 

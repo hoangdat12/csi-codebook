@@ -13,7 +13,7 @@ function W = generateTypeIIPrecoder(cfg, i1, i2)
     validateInputs(nLayers, sbAmplitude, i1, i2);
 
     % Get PMI variables
-    [i11, i12, ~, i14, i21, i22] = computeInputs(L, i1, i2) ;
+    [i11, i12, ~, i14, i21, i22] = computeInputs(L, i1, i2);
 
     % Compute values
     [n1, n2] = computeN1N2(L, N1, N2, i12);

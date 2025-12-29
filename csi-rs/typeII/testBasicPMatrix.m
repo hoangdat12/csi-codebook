@@ -1,4 +1,4 @@
-function W = test()
+function W = testBasicPMatrix()
     L = 4;
     NPsk = 8;
     N1 = 4; N2 = 4; O1 = 4; O2 = 4;
@@ -13,7 +13,7 @@ function W = test()
     i1 = {i11, i12, i13, i14};
     i2 = {i21, i22};
 
-    [i11, i12, ~, i14, i21, i22] = computeInputs(L, i1, i2);
+    [i11, i12, ~, i14, i21, i22] = computeInputs(L, i1, i2)
     q1 = i11(1); q2 = i11(2);
     
     [n1, n2] = computeN1N2(L, N1, N2, i12);
