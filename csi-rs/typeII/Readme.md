@@ -270,17 +270,11 @@ UE **không báo trực tiếp** n1, n2
 ### 4.2 m1, m2 – Beam indices thực
 
 **Công thức**:
-[
-m_1 = O_1 n_1 + q_1
-]
-[
-m_2 = O_2 n_2 + q_2
-]
+$$m_1 = O_1 n_1 + q_1$$
+$$m_2 = O_2 n_2 + q_2$$
 
 Dùng để sinh vector beam:
-[
-u_{m_1,m_2}(n_1,n_2)
-]
+$$u_{m_1,m_2}(n_1,n_2)$$
 
 ---
 
