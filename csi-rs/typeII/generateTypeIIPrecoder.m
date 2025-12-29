@@ -35,28 +35,27 @@ function W = generateTypeIIPrecoder(cfg, i1, i2)
 end
 
 function validateInputs(nLayers, sbAmplitude, i1, i2)
-    if  nLayers == 1
-        if length(i1) ~= 4
-            warning("Invalid i1 parameters!");
+    if length(i1) ~= 4
+        warning("Cấu trúc i1 phải gồm 4 phần tử Cell: {i11, i12, i13, i14}.");
+    else
+        if nLayers == 2
+            if size(i1{3}, 2) < 2 && size(i1{3}, 1) < 2
+                warning("Với Layer 2, i13 và i14 cần chứa dữ liệu của cả 2 lớp (dạng ma trận/vector).");
+            end
         end
-        if sbAmplitude 
-            if length(i2) ~= 2
-                warning("Invalid i2 parameters!");
-            end
-        else 
-            if length(i2) ~= 1
-                warning("Invalid i2 parameters!");
-            end
+    end
+
+    if sbAmplitude
+        if length(i2) ~= 2
+            warning("Khi có Subband Amplitude, i2 phải gồm 2 phần tử Cell: {i21, i22}.");
+        end
+        
+        if nLayers == 2 && size(i2{1}, 1) < 2
+             warning("Với Layer 2, i21 và i22 phải là ma trận có 2 hàng.");
         end
     else
-        if sbAmplitude 
-            if length(i2) ~= 4
-                warning("Invalid i2 parameters!");
-            end
-        else 
-            if length(i2) ~= 2
-                warning("Invalid i2 parameters!");
-            end
+        if length(i2) ~= 1
+            warning("Khi không có Subband Amplitude, i2 chỉ được có 1 phần tử Cell {i21}.");
         end
     end
 end

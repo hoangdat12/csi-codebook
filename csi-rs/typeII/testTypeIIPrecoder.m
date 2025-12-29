@@ -20,7 +20,7 @@ i22 = [0, 1, 0, 1, 0 ; 1, 1, 0, 0, 1];
 i1 = {i11, i12, i13, i14};
 i2 = {i21, i22};
 
-W = generateTypeIIPrecoder(cfg, i1, i2);
+W = generateTypeIIPrecoder(cfg, i1, i2)
 
 % W =
 

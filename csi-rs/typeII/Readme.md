@@ -403,6 +403,15 @@ Tính các chỉ số beam theo lưới anten.
 - `n1`: chỉ số beam theo chiều N1
 - `n2`: chỉ số beam theo chiều N2
 
+**Example**
+
+_Output_
+```matlab
+n1 = [3, 0, 2, 3]
+
+n2 = [2, 3, 3, 3]
+```
+
 ---
 
 ### mappingAmplitudesK1K2ToP1P2
@@ -416,6 +425,21 @@ Tính các chỉ số beam theo lưới anten.
 **Output**
 - `p1_li`: hệ số biên độ nhóm 1
 - `p2_li`: hệ số biên độ nhóm 2
+
+**Example**
+
+_Output_
+```matlab
+p1_li = [
+    0.3536    0.7071    0.5000    1.0000         0    0.1768    0.2500    0.1250;
+    0.2500    1.0000    0.1768    0.3536    0.1250    0.5000    0.7071         0
+]
+
+p2_li = [
+    0.7071    0.7071    1.0000    1.0000    1.0000    0.7071    1.0000    1.0000;
+    0.7071    1.0000    1.0000    0.7071    1.0000    1.0000    1.0000    1.0000
+]
+```
 
 ---
 
@@ -431,6 +455,155 @@ Tính giá trị pha cho các hệ số precoding.
 
 **Output**
 - `phi`: ma trận pha của các hệ số precoding
+
+**Example**
+
+_Output_
+```matlab
+phi = [
+    0.7071 + 0.7071i, -0.7071 + 0.7071i, -1.0000 + 0.0000i,  1.0000 + 0.0000i, ...
+    1.0000 + 0.0000i,  0.0000 + 1.0000i, -0.7071 - 0.7071i, -0.0000 - 1.0000i;
+
+    0.0000 + 1.0000i,  1.0000 + 0.0000i,  1.0000 + 0.0000i, -0.7071 - 0.7071i, ...
+    0.0000 + 1.0000i, -1.0000 + 0.0000i, -0.0000 - 1.0000i,  1.0000 + 0.0000i
+]
+```
+
+### computePrecodingMatrix
+
+**Mô tả** Tạo ra ma trận đơn vị W_l
+
+**Input**
+- `L`: Số lượng layers (lớp truyền dẫn).
+- `N1, N2`: Số lượng cổng antenna theo chiều ngang và chiều dọc.
+- `O1, O2`: Hệ số oversampling tương ứng cho $N_1$ và $N_2$.
+- `n1, n2`: Các chỉ số quay pha hoặc chỉ số beam cơ sở.
+- `q1, q2`: Các chỉ số beam bổ trợ.
+- `p1_li, p2_li`: Ma trận hệ số biên độ (Likelihood matrices).
+- `phi`: Ma trận pha đã tính toán từ hàm `computePhi`.
+
+**Output**
+- `W`: Ma trận Precoding (Complex Matrix) dùng cho bộ tạo tín hiệu.
+
+**Example**
+
+_Output_
+```matlab
+W_l = [
+   0.0628 + 0.1030i
+   0.0558 - 0.0449i
+   0.0284 - 0.0201i
+  -0.0340 - 0.0974i
+   0.1575 - 0.0687i
+  -0.0666 - 0.1455i
+  -0.0912 + 0.0059i
+  -0.0929 + 0.0603i
+  -0.0343 - 0.3944i
+  -0.4038 - 0.0558i
+  -0.1575 + 0.3032i
+   0.1564 + 0.2878i
+  -0.2060 - 0.2144i
+  -0.2506 + 0.1718i
+   0.0628 + 0.2286i
+   0.2089 + 0.0929i
+  -0.0343 - 0.0343i
+  -0.0449 + 0.0186i
+  -0.0000 + 0.0486i
+   0.0449 + 0.0186i
+  -0.0343 + 0.0486i
+   0.0317 + 0.0503i
+   0.0586 - 0.0101i
+   0.0131 - 0.0580i
+  -0.0142 - 0.0343i
+  -0.0372 + 0.0000i
+  -0.0142 + 0.0343i
+   0.0263 + 0.0263i
+  -0.0829 + 0.0000i
+  -0.0317 + 0.0766i
+   0.0586 + 0.0586i
+   0.0766 - 0.0317i
+]
+```
+
+### generateTypeIIPrecoder
+
+**Mô tả** Hàm chính thực hiện quy trình tạo ma trận Precoding Type II Codebook theo tiêu chuẩn 5G NR. Hàm này giải mã các chỉ số từ UE phản hồi (CSI feedback) và kết hợp các thành phần không gian (spatial), biên độ (amplitude) và pha (phase) để tạo ra ma trận trọng số tối ưu.
+
+**Input**
+- `cfg`: Cấu trúc cấu hình hệ thống (System configuration) bao gồm:
+  - `N1, N2`: Số cổng anten (horizontal/vertical).
+  - `O1, O2`: Hệ số quá mẫu (oversampling factors).
+  - `L`: Số lớp truyền dẫn (layers).
+- `i1`: Tập hợp các chỉ số băng rộng (wideband indices) như `i11`, `i12`, `i13`, `i14`.
+- `i2`: Tập hợp các chỉ số băng hẹp/phụ (subband indices) như `i21`, `i22`.
+
+**Output**
+- `W`: Ma trận Precoding cuối cùng (thường có kích thước $P \times L$, với $P$ là tổng số cổng anten).
+
+**Example**
+
+_Input_
+```matlab
+cfg = struct();
+
+cfg.CodebookConfig.N1 = 4;
+cfg.CodebookConfig.N2 = 4;
+cfg.CodebookConfig.O1 = 4;
+cfg.CodebookConfig.O2 = 4;
+
+cfg.CodebookConfig.NumberOfBeams = 4;     % L
+cfg.CodebookConfig.PhaseAlphabetSize = 8; % NPSK
+cfg.CodebookConfig.SubbandAmplitude = true;
+cfg.CodebookConfig.numLayers = 2;         % nLayers
+
+i11 = [2, 1];
+i12 = [2];
+i13 = [3, 1];
+i14 = [4, 6, 5, 0, 2, 3, 1 ; 3, 2, 4, 1, 5, 6, 0];
+i21 = [1, 3, 4, 2, 5, 7 ; 2, 0, 5, 1, 4, 6];
+i22 = [0, 1, 0, 1, 0 ; 1, 1, 0, 0, 1];
+
+i1 = {i11, i12, i13, i14};
+i2 = {i21, i22};
+```
+
+_Output_
+```matlab
+W = [
+   0.0444 + 0.0728i   0.1286 + 0.0000i
+   0.0394 - 0.0317i   0.0369 - 0.1485i
+   0.0201 - 0.0142i  -0.1231 - 0.0588i
+  -0.0240 - 0.0689i  -0.0891 + 0.0615i
+   0.1114 - 0.0486i   0.0588 + 0.0909i
+  -0.0471 - 0.1029i   0.0768 - 0.0318i
+  -0.0645 + 0.0042i   0.0227 - 0.0604i
+  -0.0657 + 0.0426i  -0.0594 - 0.0738i
+  -0.0243 - 0.2789i   0.0000 + 0.1740i
+  -0.2855 - 0.0394i   0.1311 + 0.0789i
+  -0.1114 + 0.2144i   0.1552 - 0.0909i
+   0.1106 + 0.2035i  -0.0543 - 0.1905i
+  -0.1457 - 0.1516i  -0.0588 + 0.0909i
+  -0.1772 + 0.1215i   0.0492 + 0.1188i
+   0.0444 + 0.1616i   0.1513 - 0.0227i
+   0.1477 + 0.0657i   0.0072 - 0.1362i
+  -0.0243 - 0.0243i  -0.0643 - 0.0748i
+  -0.0317 + 0.0131i  -0.1024 + 0.0098i
+  -0.0000 + 0.0343i  -0.0302 + 0.1211i
+   0.0317 + 0.0131i   0.1090 + 0.0532i
+  -0.0243 + 0.0343i  -0.0984 + 0.0302i
+   0.0224 + 0.0356i  -0.0307 + 0.0937i
+   0.0415 - 0.0071i   0.0909 + 0.0804i
+   0.0093 - 0.0410i   0.1003 - 0.0742i
+  -0.0101 - 0.0243i   0.1070 - 0.0643i
+  -0.0263 + 0.0000i  -0.0394 - 0.1147i
+  -0.0101 + 0.0243i  -0.0984 - 0.0075i
+   0.0186 + 0.0186i  -0.0655 + 0.0793i
+  -0.0586 + 0.0000i  -0.0075 - 0.1211i
+  -0.0224 + 0.0542i  -0.1234 - 0.0184i
+   0.0415 + 0.0415i  -0.0482 + 0.0909i
+   0.0542 - 0.0224i   0.0445 + 0.0880i
+]
+```
 
 ---
 ## 8. Tài liệu tham chiếu
