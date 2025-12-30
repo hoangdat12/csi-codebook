@@ -1,4 +1,5 @@
-function W = generateTypeISinglePanelPrecoder(codebookMode, nLayers, N1, N2, O1, O2, i11, i12, i13, i2, nPorts)
+function W = generateTypeISinglePanelPrecoder(codebookMode, nLayers, N1, N2, O1, O2, i11, i12, i13, i2)
+    nPorts = N1 * N2 * 2;
     validateInputs(NPorts, N1, N2, O1, O2);
 
     % Co-phasing factor set (QPSK)
