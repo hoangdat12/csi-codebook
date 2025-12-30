@@ -168,6 +168,147 @@ Tất cả các thông tin trên được gNB suy ra từ:
 ## 10. Cách dùng các hàm
 
 ### validateInputs
+**Mô tả**  
+Kiểm tra tính hợp lệ của các tham số CSI do UE báo cáo.
+
+**Input**
+- `nPorts`: Số lượng Antenna ports
+- `N1`: Số phần tử anten theo chiều ngang (horizontal dimension) của panel
+- `N2`: Số phần tử anten theo chiều dọc (vertical dimension) của panel
+- `O1`: Hệ số oversampling theo chiều ngang dùng cho chỉ số PMI.
+- `O2`: Hệ số oversampling theo chiều dọc dùng cho chỉ số PMI.
+
+**Output**
+- Không có (chỉ thực hiện kiểm tra)
+
+--- 
+
+### computeInputs
+**Mô tả**  
+Trích xuất và xác định các chỉ số CSI đầu vào từ tập chỉ số UE báo cáo, dựa trên cấu hình anten và số layer truyền.  
+Các chỉ số không áp dụng sẽ được gán bằng 0.
+
+**Input**
+- `i1`: tập chỉ số beam `{i11, i12, i13}`
+- `i2`: tập chỉ số hệ số `{i21, i22}`
+- `N2`: số phần tử anten theo chiều dọc
+- `nLayers`: số layer truyền
+
+**Output**
+- `i11`: chỉ số beam chính
+- `i12`: chỉ số beam theo chiều dọc (bằng 0 nếu `N2 = 1`)
+- `i13`: chỉ số beam phụ (chỉ được báo khi v = {2, 3, 4})
+- `i2`: tập chỉ số hệ số (giữ nguyên)
+
+**Example**
+
+__Input__
+
+__Output__
+
+---
+
+### getBeamIndices
+**Mô tả**  
+Xác định các chỉ số beam hai chiều và chỉ số pha tương ứng cho **Type I Codebook – Single Panel** dựa trên chế độ codebook, số layer truyền và các chỉ số CSI do UE báo cáo.  
+Hàm ánh xạ các chỉ số PMI (`i11`, `i12`, `i13`, `i2`) sang các chỉ số beam `(l, m, l′, m′, l″, m″, l‴, m‴)` theo các bảng quy định trong **3GPP TS 38.214**, tương ứng với từng cấu hình rank và codebook mode.
+
+**Input**
+- `codebookMode`: chế độ codebook (Mode 1 hoặc Mode 2)
+- `nLayers`: số layer truyền
+- `i11`: chỉ số beam chính
+- `i12`: chỉ số beam theo chiều dọc
+- `i13`: chỉ số beam phụ
+- `i2`: chỉ số pha
+- `N1`: số phần tử anten theo chiều ngang
+- `N2`: số phần tử anten theo chiều dọc
+- `O1`: hệ số oversampling theo chiều ngang
+- `O2`: hệ số oversampling theo chiều dọc
+
+**Output**
+- `l`, `m`: chỉ số beam của layer thứ nhất
+- `lp`, `mp`: chỉ số beam của layer thứ hai
+- `lpp`, `mpp`: chỉ số beam của layer thứ ba
+- `lppp`, `mppp`: chỉ số beam của layer thứ tư
+- `p`: chỉ số beam bổ sung (áp dụng cho một số cấu hình nhiều layer)
+- `n`: chỉ số pha tương ứng với beam
+
+**Example**
+
+__Input__
+
+__Output__
+
+---
+
+### getK1K2
+**Mô tả**  
+Xác định các độ lệch chỉ số beam `(k1, k2)` dùng để tạo các beam phụ cho **Type I Codebook – Single Panel**, dựa trên số layer truyền, cấu hình anten và chỉ số PMI `i13` do UE báo cáo.  
+Hàm ánh xạ `i13` sang các giá trị `(k1, k2)` theo các bảng quy định trong **3GPP TS 38.214**, áp dụng cho báo cáo CSI từ 2 đến 4 layer.
+
+**Input**
+- `layers`: số layer truyền
+- `i13`: chỉ số beam phụ do UE báo cáo
+- `N1`: số phần tử anten theo chiều ngang
+- `N2`: số phần tử anten theo chiều dọc
+- `O1`: hệ số oversampling theo chiều ngang
+- `O2`: hệ số oversampling theo chiều dọc
+
+**Output**
+- `k1`: độ lệch chỉ số beam theo chiều ngang
+- `k2`: độ lệch chỉ số beam theo chiều dọc
+
+**Example**
+
+__Input__
+
+__Output__
+
+---
+
+### computeBeam
+**Mô tả**  
+Tính toán vector beam hai chiều cho **Type I Codebook – Single Panel** dựa trên các chỉ số beam theo chiều ngang và chiều dọc.  
+Hàm tạo vector steering cho từng chiều và kết hợp chúng bằng phép tích Kronecker để thu được vector beam hoàn chỉnh.
+
+**Input**
+- `l`: chỉ số beam theo chiều ngang
+- `m`: chỉ số beam theo chiều dọc
+- `N1`: số phần tử anten theo chiều ngang
+- `N2`: số phần tử anten theo chiều dọc
+- `O1`: hệ số oversampling theo chiều ngang
+- `O2`: hệ số oversampling theo chiều dọc
+- `phaseFactor`: hệ số pha (±1) dùng trong biểu thức tạo beam
+
+**Output**
+- `v`: vector beam phức có kích thước `(N1 × N2) × 1`
+
+**Example**
+
+__Input__
+
+__Output__
+
+--- 
+
+### generateTypeISinglePanelPrecoder
+**Mô tả**  
+Sinh ma trận tiền mã hóa (precoding matrix) cho **Type I Codebook – Single Panel** dựa trên số layer truyền và các chỉ số CSI do UE báo cáo.  
+Hàm thực hiện toàn bộ chuỗi xử lý từ kiểm tra tham số, trích xuất chỉ số PMI, xác định chỉ số beam, tạo vector beam và kết hợp chúng để tạo ma trận precoder theo các bảng quy định trong **3GPP TS 38.214**.
+
+**Input**
+- `nLayers`: số layer truyền
+- `i1`: tập chỉ số beam `{i11, i12, i13}`
+- `i2`: chỉ số pha do UE báo cáo
+
+**Output**
+- `W`: ma trận tiền mã hóa có kích thước `(nPorts × nLayers)`
+
+**Example**
+
+__Input__
+
+__Output__
 
 ---
 
