@@ -100,47 +100,49 @@ Bao gồm các thành phần:
 
 ## 6. Chi tiết cấu trúc PMI ($i_1, i_2$)
 
-Mỗi báo cáo PMI bao gồm hai nhóm chỉ số: **$i_1$ (Wideband/Long-term)** và **$i_2$ (Subband/Short-term)**.
+Mỗi báo cáo PMI được xác định bởi cặp chỉ số codebook $(i_1, i_2)$. Cấu trúc của các vector này thay đổi chính xác theo công thức dưới đây.
 
-### 6.1 Các tham số trong $i_1$
-Vector $i_1$ có thể bao gồm các thành phần sau tùy thuộc vào Rank và Mode:
+### 6.1 Vector $i_1$ (Wideband/Long-term)
+Cấu trúc của $i_1$ phụ thuộc vào Rank ($\nu$) như sau:
 
-1.  **$i_{1,1}$ (Beam chiều 1):**
-    - Chọn beam index theo chiều $N_1$.
-    - Miền giá trị: $0, \dots, N_1 O_1 - 1$.
+$$
+i_1 = 
+\begin{cases} 
+[i_{1,1}, \ i_{1,2}, \ i_{1,4}] & \text{khi } \nu = 1 \\
+[i_{1,1}, \ i_{1,2}, \ i_{1,3}, \ i_{1,4}] & \text{khi } \nu \in \{2, 3, 4\}
+\end{cases}
+$$
 
-2.  **$i_{1,2}$ (Beam chiều 2):**
-    - Chọn beam index theo chiều $N_2$.
-    - Miền giá trị: $0, \dots, N_2 O_2 - 1$.
-    - *Lưu ý:* Nếu $N_2 = 1$, tham số này không được báo cáo (mặc định = 0).
+**Giải thích các thành phần:**
+1.  **$i_{1,1}$**: Beam index theo chiều $N_1$.
+2.  **$i_{1,2}$**: Beam index theo chiều $N_2$.
+3.  **$i_{1,3}$**: Chỉ số mapping layer (Có mặt trong vector khi Rank $\ge 2$).
+4.  **$i_{1,4}$**: Chỉ số liên quan đến đồng pha panel (Xem mục 6.2).
 
-3.  **$i_{1,3}$ (Layer Mapping):**
-    - **Chỉ xuất hiện khi Rank = 3 hoặc 4.**
-    - Xác định giá trị $k_1, k_2$ để map beam cho các layer khác nhau (theo Table 5.2.2.2.2-2).
+### 6.2 Cấu trúc $i_{1,4}$ và $i_2$ theo codebookMode
 
-4.  **$i_{1,4}$ (Panel Co-phasing):**
-    - Xác định hệ số đồng pha giữa các panel.
-    - Cấu trúc phụ thuộc số panel:
-        - Nếu $N_g = 2$: $i_{1,4} = [i_{1,4,1}]$.
-        - Nếu $N_g = 4$: $i_{1,4} = [i_{1,4,1}, i_{1,4,2}, i_{1,4,3}]$.
+#### Trường hợp A: codebookMode = 1
+Khi `codebookMode` được đặt là '1', cấu trúc của $i_{1,4}$ phụ thuộc vào số lượng panel ($N_g$):
 
-### 6.2 Các tham số trong $i_2$
-Tham số $i_2$ dùng để chọn beam (beam selection) và đồng pha phân cực (polarization co-phasing).
+$$
+i_{1,4} = 
+\begin{cases} 
+i_{1,4,1} & \text{khi } N_g = 2 \text{ (1 giá trị)} \\
+[i_{1,4,1}, \ i_{1,4,2}, \ i_{1,4,3}] & \text{khi } N_g = 4 \text{ (3 giá trị)}
+\end{cases}
+$$
 
-- **Với codebookMode = 1:**
-    - $i_2$ là một giá trị đơn (scalar).
-    - Ví dụ: $i_2 \in \{0, 1\}$ hoặc $\{0, 1, 2, 3\}$.
+*(Trong mode này, $i_2$ thường là một giá trị đơn lẻ tùy theo bảng).*
 
-- **Với codebookMode = 2 (Chỉ $N_g=2$):**
-    - $i_2$ phức tạp hơn, bao gồm nhiều phần tử con cho từng layer hoặc nhóm layer.
-    - Ký hiệu: $i_2 = [i_{2,0}, i_{2,1}, \dots]$.
+#### Trường hợp B: codebookMode = 2
+Khi `codebookMode` được đặt là '2' (chỉ áp dụng cho $N_g=2$), cấu trúc vector mở rộng như sau:
 
-### 6.3 Tóm tắt Mapping tham số PMI
-| Rank ($\nu$) | Thành phần của $i_1$ | Thành phần của $i_2$ |
-| :--- | :--- | :--- |
-| **1** | $i_{1,1}, i_{1,2}, i_{1,4}$ | $i_2$ |
-| **2** | $i_{1,1}, i_{1,2}, i_{1,4}$ | $i_2$ (Mode 1) hoặc $i_{2,0}, i_{2,1} \dots$ (Mode 2) |
-| **3, 4** | $i_{1,1}, i_{1,2}, \mathbf{i_{1,3}}, i_{1,4}$ | $i_2$ |
+$$
+\begin{aligned}
+i_{1,4} &= [i_{1,4,1}, \ i_{1,4,2}] \\
+i_2 &= [i_{2,0}, \ i_{2,1}, \ i_{2,2}]
+\end{aligned}
+$$
 
 ---
 
@@ -163,3 +165,13 @@ Tham số $i_2$ dùng để chọn beam (beam selection) và đồng pha phân c
 Các cổng antenna CSI-RS được đánh số bắt đầu từ 3000.
 - Dải cổng: $3000$ đến $3000 + P_{CSI-RS} - 1$.
 - Ví dụ: Với 8 ports, các cổng là $3000, 3001, \dots, 3007$.
+
+---
+
+## 9. Thông số ví dụ
+
+
+
+---
+
+## 10. Cách dùng các hàm
