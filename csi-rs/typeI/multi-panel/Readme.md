@@ -170,40 +170,62 @@ Các cổng antenna CSI-RS được đánh số bắt đầu từ 3000.
 
 ## 9. Ví dụ Minh Họa Giá Trị Báo Cáo (Examples)
 
-Dưới đây là các ví dụ cụ thể về giá trị PMI ($i_1$) trong báo cáo thực tế, minh họa sự khác biệt khi thay đổi số panel ($N_g$) và số layer (Rank).
+Dưới đây là các ví dụ cụ thể về bộ giá trị $(i_1, i_2)$ trong báo cáo thực tế, minh họa sự khác biệt giữa Mode 1 và Mode 2.
 
-### Ví dụ 1: Cấu hình 2 Panel, Truyền 1 Layer (Rank 1)
+### Ví dụ 1: Cấu hình 2 Panel, Rank 1 (Mode 1)
 **Cấu hình:**
 - $N_g = 2$
-- $N_1 = 4, N_2 = 1$ (Tổng 16 ports)
+- $N_1 = 4, N_2 = 1$
 - `codebookMode` = 1
 - **Rank ($\nu$) = 1**
 
-**Giá trị báo cáo $i_1$:**
-Do Rank = 1 nên vector không chứa $i_{1,3}$.
-Do $N_g = 2$ (Mode 1) nên $i_{1,4}$ chỉ có 1 phần tử.
-
-- $i_{1,1} = 1$ (Chọn beam index theo chiều ngang)
-- $i_{1,2} = 0$ (Mặc định bằng 0 do $N_2=1$)
-- $i_{1,4} = [1]$ (Hệ số pha giữa Panel 1 và Panel 2)
+**Giá trị báo cáo:**
+- **$i_1$ (Wideband):**
+    - $i_{1,1} = 1$
+    - $i_{1,2} = 0$ (Mặc định do $N_2=1$)
+    - **$i_{1,4} = 1$** (Chỉ 1 giá trị pha liên panel do Mode 1)
+- **$i_2$ (Subband):**
+    - **$i_2 = 0$** (Giá trị đơn - Scalar)
 
 ---
 
-### Ví dụ 2: Cấu hình 4 Panel, Truyền 2 Layers (Rank 2)
+### Ví dụ 2: Cấu hình 4 Panel, Rank 2 (Mode 1)
 **Cấu hình:**
 - $N_g = 4$
-- $N_1 = 2, N_2 = 1$ (Tổng 16 ports)
+- $N_1 = 2, N_2 = 1$
 - `codebookMode` = 1 (Bắt buộc với $N_g=4$)
 - **Rank ($\nu$) = 2**
 
-**Giá trị báo cáo $i_1$:**
-Do Rank = 2 nên vector **xuất hiện $i_{1,3}$** để map layer.
-Do $N_g = 4$ nên $i_{1,4}$ bắt buộc phải là **vector 3 phần tử** $[i_{1,4,1}, i_{1,4,2}, i_{1,4,3}]$.
+**Giá trị báo cáo:**
+- **$i_1$ (Wideband):**
+    - $i_{1,1} = 2$
+    - $i_{1,2} = 0$
+    - **$i_{1,3} = 0$** (Có mặt do Rank $\ge 2$ để map layer)
+    - **$i_{1,4} = [1, 0, 2]$** (Vector 3 phần tử do $N_g=4$)
+- **$i_2$ (Subband):**
+    - **$i_2 = 1$** (Giá trị đơn - Scalar)
 
-- $i_{1,1} = 2$
-- $i_{1,2} = 0$
-- **$i_{1,3} = 0$** (Chỉ số Layer Mapping, tra cứu bảng Table 5.2.2.2.1-3)
-- **$i_{1,4} = [1, 0, 2]$** (Pha của 3 panel còn lại so với panel quy chiếu)
+---
+
+### Ví dụ 3: Cấu hình 2 Panel, Rank 2 (Mode 2 - Chi tiết cao)
+*Đây là chế độ phức tạp nhất, cung cấp thông tin pha/biên độ chi tiết hơn.*
+
+**Cấu hình:**
+- $N_g = 2$
+- $N_1 = 4, N_2 = 1$
+- `codebookMode` = 2 (Chỉ áp dụng được khi $N_g=2$)
+- **Rank ($\nu$) = 2**
+
+**Giá trị báo cáo:**
+Do Mode = 2, cả $i_{1,4}$ và $i_2$ đều chuyển thành dạng vector mở rộng.
+
+- **$i_1$ (Wideband):**
+    - $i_{1,1} = 3$
+    - $i_{1,2} = 0$
+    - $i_{1,3} = 1$ (Layer Mapping)
+    - **$i_{1,4} = [1, 2]$** (Vector **2 phần tử** thay vì 1 như ở Mode 1)
+- **$i_2$ (Subband):**
+    - **$i_2 = [0, 1, 0]$** (Vector **3 phần tử** $[i_{2,0}, i_{2,1}, i_{2,2}]$ thay vì giá trị đơn)
 
 ---
 
