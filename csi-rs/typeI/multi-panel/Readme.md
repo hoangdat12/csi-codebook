@@ -135,7 +135,7 @@ $$
 *(Trong mode này, $i_2$ thường là một giá trị đơn lẻ tùy theo bảng).*
 
 #### Trường hợp B: codebookMode = 2
-Khi `codebookMode` được đặt là '2' (chỉ áp dụng cho $N_g=2$), cấu trúc vector mở rộng như sau:
+Khi `codebookMode` được đặt là '2', cấu trúc vector mở rộng như sau:
 
 $$
 \begin{aligned}
@@ -168,9 +168,42 @@ Các cổng antenna CSI-RS được đánh số bắt đầu từ 3000.
 
 ---
 
-## 9. Thông số ví dụ
+## 9. Ví dụ Minh Họa Giá Trị Báo Cáo (Examples)
 
+Dưới đây là các ví dụ cụ thể về giá trị PMI ($i_1$) trong báo cáo thực tế, minh họa sự khác biệt khi thay đổi số panel ($N_g$) và số layer (Rank).
 
+### Ví dụ 1: Cấu hình 2 Panel, Truyền 1 Layer (Rank 1)
+**Cấu hình:**
+- $N_g = 2$
+- $N_1 = 4, N_2 = 1$ (Tổng 16 ports)
+- `codebookMode` = 1
+- **Rank ($\nu$) = 1**
+
+**Giá trị báo cáo $i_1$:**
+Do Rank = 1 nên vector không chứa $i_{1,3}$.
+Do $N_g = 2$ (Mode 1) nên $i_{1,4}$ chỉ có 1 phần tử.
+
+- $i_{1,1} = 1$ (Chọn beam index theo chiều ngang)
+- $i_{1,2} = 0$ (Mặc định bằng 0 do $N_2=1$)
+- $i_{1,4} = [1]$ (Hệ số pha giữa Panel 1 và Panel 2)
+
+---
+
+### Ví dụ 2: Cấu hình 4 Panel, Truyền 2 Layers (Rank 2)
+**Cấu hình:**
+- $N_g = 4$
+- $N_1 = 2, N_2 = 1$ (Tổng 16 ports)
+- `codebookMode` = 1 (Bắt buộc với $N_g=4$)
+- **Rank ($\nu$) = 2**
+
+**Giá trị báo cáo $i_1$:**
+Do Rank = 2 nên vector **xuất hiện $i_{1,3}$** để map layer.
+Do $N_g = 4$ nên $i_{1,4}$ bắt buộc phải là **vector 3 phần tử** $[i_{1,4,1}, i_{1,4,2}, i_{1,4,3}]$.
+
+- $i_{1,1} = 2$
+- $i_{1,2} = 0$
+- **$i_{1,3} = 0$** (Chỉ số Layer Mapping, tra cứu bảng Table 5.2.2.2.1-3)
+- **$i_{1,4} = [1, 0, 2]$** (Pha của 3 panel còn lại so với panel quy chiếu)
 
 ---
 
