@@ -1,4 +1,13 @@
-function W = generateTypeIMultiPanelPrecoder(codebookMode, nLayers, n_g, N1, N2, O1, O2, i11, i12, i13, i14, i2, nPorts)
+function W = generateTypeIMultiPanelPrecoder(cfg, nLayers, n_g, i1, i2)
+    N1 = cfg.CodebookConfig.N1;
+    N2 = cfg.CodebookConfig.N2;
+    O1 = cfg.CodebookConfig.O1;
+    O2 = cfg.CodebookConfig.O2;
+    nPorts = cfg.CodebookConfig.nPorts;
+    codebookMode = cfg.CodebookConfig.codebookMode;
+
+    [i11, i12, i13, i14, i2] = computeInputs(nLayers, i1, i2, N2);
+
     validateInputs(codebookMode, nLayers, n_g, N1, N2, O1, O2, i11, i12, i13, i14, i2, nPorts);
 
     [l, lp, m, mp, p, n] = getBeamIndices(nLayers, i11, i12, i13, i14, i2, N1, N2, O1, O2);
@@ -7,6 +16,7 @@ function W = generateTypeIMultiPanelPrecoder(codebookMode, nLayers, n_g, N1, N2,
         case 1
             % Rank 1: Single layer precoding using base beam v_lm
             v_lm = computeBeam(l, m, N1, N2, O1, O2, 2);
+
             if codebookMode == 1
                 W = calcWMatrixMultiPanel(p, n, n_g, 1, 1, v_lm, nPorts);
             elseif codebookMode == 2
@@ -101,6 +111,24 @@ function W = generateTypeIMultiPanelPrecoder(codebookMode, nLayers, n_g, N1, N2,
 end
 
 %% --- HELPER FUNCTIONS ---
+
+function [i11, i12, i13, i14, i2] = computeInputs(nLayers, i1, i2, N2)
+    i11 = i1{1};
+
+    if N2 == 1
+        i12 = 0;
+    else 
+        i12 = i1{2};
+    end
+
+    if nLayers == 1
+        i13 = 0;
+    else 
+        i13 = i1{3};
+    end
+
+    i14 = i1{4};
+end
 
 function [l, lp, m, mp, p, n] = getBeamIndices(nLayers, i11, i12, i13, i14, i2, N1, N2, O1, O2)
     % Initialize default values to 0 to prevent "undefined variable" errors
@@ -203,21 +231,21 @@ function b_n = computeBN(n)
     b_n = exp(-1j*pi/4)*exp(1j*pi*n/2);
 end
 
-function W = calcWMatrixMultiPanel(p, n, n_g, idx_rank, rank, v_lm, nPorts)
+function W = calcWMatrixMultiPanel(p, n, Ng, idxRank, rank, vLm, nPorts)
     % Power normalization factor based on the total number of CSI-RS ports
     norm_factors = 1/(sqrt(nPorts)); 
 
-    if n_g == 2
+    if Ng == 2
         if rank == 1
             % Based on W^{x, 2, 1} formulas
-            phi_p1 = computePhiP(p); 
+            phi_p1 = computePhiP(p(1)); 
             phi_n  = computePhiN(n); 
             
-            if idx_rank == 1
-                W = norm_factors * [v_lm; phi_n*v_lm; phi_p1*v_lm; phi_n*phi_p1*v_lm];
+            if idxRank == 1
+                W = norm_factors * [vLm; phi_n*vLm; phi_p1*vLm; phi_n*phi_p1*vLm];
             else
                 % W^{2, 2, 1} uses -phi_n
-                W = norm_factors * [v_lm; -phi_n*v_lm; phi_p1*v_lm; -phi_n*phi_p1*v_lm];
+                W = norm_factors * [vLm; -phi_n*vLm; phi_p1*vLm; -phi_n*phi_p1*vLm];
             end
             
         elseif rank == 2
@@ -228,34 +256,34 @@ function W = calcWMatrixMultiPanel(p, n, n_g, idx_rank, rank, v_lm, nPorts)
             b_n1 = computeBN(n(2));
             b_n2 = computeBN(n(3));
 
-            if idx_rank == 1
-                W = norm_factors * [v_lm; phi_n0*v_lm; a_p1*b_n1*v_lm; a_p2*b_n2*v_lm];
+            if idxRank == 1
+                W = norm_factors * [vLm; phi_n0*vLm; a_p1*b_n1*vLm; a_p2*b_n2*vLm];
             else
                 % W^{2, 2, 2} uses negative signs for certain polarization components
-                W = norm_factors * [v_lm; -phi_n0*v_lm; a_p1*b_n1*v_lm; -a_p2*b_n2*v_lm];
+                W = norm_factors * [vLm; -phi_n0*vLm; a_p1*b_n1*vLm; -a_p2*b_n2*vLm];
             end
         end
 
-    elseif n_g == 4
+    elseif Ng == 4
         % Based on W^{x, 4, 1} formulas
         phi_n = computePhiN(n); 
         phi_p1 = computePhiP(p(1));
         phi_p2 = computePhiP(p(2));
         phi_p3 = computePhiP(p(3));
 
-        if idx_rank == 1
-            W = norm_factors * [v_lm; ...
-                                phi_n*v_lm; ...
-                                phi_p1*v_lm; phi_n*phi_p1*v_lm; ...
-                                phi_p2*v_lm; phi_n*phi_p2*v_lm; ...
-                                phi_p3*v_lm; phi_n*phi_p3*v_lm];
+        if idxRank == 1
+            W = norm_factors * [vLm; ...
+                                phi_n*vLm; ...
+                                phi_p1*vLm; phi_n*phi_p1*vLm; ...
+                                phi_p2*vLm; phi_n*phi_p2*vLm; ...
+                                phi_p3*vLm; phi_n*phi_p3*vLm];
         else
             % Alternating signs for the second layer in multi-panel
-            W = norm_factors * [v_lm; ...
-                                -phi_n*v_lm; ...
-                                phi_p1*v_lm; -phi_n*phi_p1*v_lm; ...
-                                phi_p2*v_lm; -phi_n*phi_p2*v_lm; ...
-                                phi_p3*v_lm; -phi_n*phi_p3*v_lm];
+            W = norm_factors * [vLm; ...
+                                -phi_n*vLm; ...
+                                phi_p1*vLm; -phi_n*phi_p1*vLm; ...
+                                phi_p2*vLm; -phi_n*phi_p2*vLm; ...
+                                phi_p3*vLm; -phi_n*phi_p3*vLm];
         end
     end
 end

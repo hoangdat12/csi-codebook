@@ -230,3 +230,279 @@ Do Mode = 2, cả $i_{1,4}$ và $i_2$ đều chuyển thành dạng vector mở 
 ---
 
 ## 10. Cách dùng các hàm
+
+# generateTypeIMultiPanelPrecoder
+
+### Mô tả
+Hàm `generateTypeIMultiPanelPrecoder` tạo ma trận tiền mã hóa (precoding matrix) cho hệ thống MIMO đa bảng (Multi-Panel) theo chuẩn 5G NR (Type I Multi-Panel Codebook - 3GPP TS 38.214). Hàm tính toán các trọng số phức dựa trên cấu hình codebook, số lớp (rank), số lượng panel ($N_g$) và các chỉ số PMI ($i_1, i_2$).
+
+### Input
+* **`cfg`** (Struct): Cấu hình hệ thống.
+    * `CodebookConfig.N1`: Số cổng ăng-ten ngang mỗi panel.
+    * `CodebookConfig.N2`: Số cổng ăng-ten dọc mỗi panel.
+    * `CodebookConfig.O1`: Hệ số lấy mẫu dư (Oversampling) ngang.
+    * `CodebookConfig.O2`: Hệ số lấy mẫu dư (Oversampling) dọc.
+    * `CodebookConfig.nPorts`: Tổng số cổng ăng-ten.
+    * `CodebookConfig.codebookMode`: Chế độ codebook (1 hoặc 2).
+* **`nLayers`** (Int): Số lớp truyền dẫn (Rank).
+* **`Ng`** (Int): Số lượng panel ăng-ten.
+* **`i1`** (Cell Array): Chỉ số PMI băng rộng `{i11, i12, i13, i14}`.
+* **`i2`** (Vector): Chỉ số PMI băng con.
+
+### Output
+* **`W`** (Matrix): Ma trận tiền mã hóa phức (`double`), kích thước $N_{ports} \times nLayers$.
+
+### Ví dụ sử dụng
+
+__Input__
+
+```matlab
+cfg.CodebookConfig.N1 = 4;
+cfg.CodebookConfig.N2 = 1;
+cfg.CodebookConfig.O1 = 4;
+cfg.CodebookConfig.O2 = 1;
+cfg.CodebookConfig.nPorts = 16;
+cfg.CodebookConfig.codebookMode = 2;
+
+nLayers = 2;
+Ng = 2;
+
+i11 = 3;
+i12 = 0;
+i13 = 1;
+i14 = [1, 2];
+
+i2 = [0, 1, 0];
+
+i1 = {i11, i12, i13, i14};
+
+W = generateTypeIMultiPanelPrecoder(cfg, nLayers, Ng, i1, i2);
+```
+
+__Output__
+
+```matlab
+W = [
+   0.1768 + 0.0000i   0.1768 + 0.0000i
+   0.0676 + 0.1633i  -0.0676 - 0.1633i
+  -0.1250 + 0.1250i  -0.1250 + 0.1250i
+  -0.1633 - 0.0676i   0.1633 + 0.0676i
+   0.1768 + 0.0000i  -0.1768 + 0.0000i
+   0.0676 + 0.1633i   0.0676 + 0.1633i
+  -0.1250 + 0.1250i   0.1250 - 0.1250i
+  -0.1633 - 0.0676i  -0.1633 - 0.0676i
+  -0.1768 + 0.0000i  -0.1768 + 0.0000i
+  -0.0676 - 0.1633i   0.0676 + 0.1633i
+   0.1250 - 0.1250i   0.1250 - 0.1250i
+   0.1633 + 0.0676i  -0.1633 - 0.0676i
+  -0.1768 + 0.0000i   0.1768 - 0.0000i
+  -0.0676 - 0.1633i  -0.0676 - 0.1633i
+   0.1250 - 0.1250i  -0.1250 + 0.1250i
+   0.1633 + 0.0676i   0.1633 + 0.0676i ]
+```
+
+---
+
+# computeInputs
+
+### Mô tả
+Hàm phụ trợ dùng để trích xuất và chuẩn hóa các thành phần chỉ số PMI từ cấu trúc dữ liệu đầu vào. Hàm xử lý logic gán giá trị mặc định (bằng 0) cho các chỉ số không được sử dụng dựa trên cấu hình anten ($N_2$) và số lớp truyền dẫn (Rank).
+
+### Input
+- `nLayers`: Số lượng lớp truyền dẫn (Transmission Rank, $\nu$).
+- `i1`: Cell array chứa các chỉ số PMI wideband, cấu trúc `{i11, i12, i13, i14}`.
+- `i2`: Chỉ số hoặc vector chỉ số PMI subband.
+- `N2`: Số phần tử anten theo chiều dọc (vertical dimension) của panel.
+
+### Output
+- `i11`: Chỉ số trực giao nhóm tia thứ nhất ($i_{1,1}$).
+- `i12`: Chỉ số trực giao nhóm tia thứ hai ($i_{1,2}$). Trả về **0** nếu $N_2 = 1$.
+- `i13`: Chỉ số ánh xạ lớp ($i_{1,3}$). Trả về **0** nếu `nLayers` = 1.
+- `i14`: Hệ số đồng pha giữa các panel ($i_{1,4}$), lấy từ phần tử thứ 4 của `i1`.
+- `i2`: Chỉ số subband ($i_2$), giữ nguyên từ đầu vào.
+
+### Ví dụ sử dụng
+
+__Input__
+
+```matlab
+cfg.CodebookConfig.N2 = 1;
+
+nLayers = 2;
+Ng = 2;
+
+i11 = 3;
+i12 = 0;
+i13 = 1;
+i14 = [1, 2];
+
+i2 = [0, 1, 0];
+
+i1 = {i11, i12, i13, i14};
+
+[i11, i12, i13, i14, i2] = computeInputs(nLayers, i1, i2, N2);
+```
+
+__Output__
+
+```matlab
+i11 = 3
+
+i12 = 0
+
+i13 = 1
+
+i14 = [1     2]
+
+i2 = [0     1     0]
+```
+
+---
+
+# validateInputs
+
+### Mô tả
+Hàm `validateInputs` thực hiện kiểm tra tính hợp lệ của toàn bộ các tham số cấu hình hệ thống, cấu trúc codebook và các chỉ số PMI ($i_1, i_2$) đầu vào. Hàm này đảm bảo các giá trị nằm trong phạm vi cho phép theo chuẩn 3GPP TS 38.214 trước khi thực hiện tính toán tiền mã hóa. Nếu có tham số không hợp lệ, hàm sẽ trả về lỗi.
+
+### Input
+* **`codebookMode`** (Int): Chế độ codebook (1 hoặc 2).
+* **`nLayers`** (Int): Số lượng lớp truyền dẫn (Rank).
+* **`Ng`** (Int): Số lượng panel ăng-ten.
+* **`N1`** (Int): Số cổng ăng-ten ngang mỗi panel.
+* **`N2`** (Int): Số cổng ăng-ten dọc mỗi panel.
+* **`O1`** (Int): Hệ số lấy mẫu dư ngang.
+* **`O2`** (Int): Hệ số lấy mẫu dư dọc.
+* **`i11`** (Int): Chỉ số chùm tia $i_{1,1}$.
+* **`i12`** (Int): Chỉ số chùm tia $i_{1,2}$.
+* **`i13`** (Int): Chỉ số tập hợp chùm tia $i_{1,3}$ (Mode 2).
+* **`i14`** (Vector): Chỉ số đồng pha băng rộng $i_{1,4}$.
+* **`i2`** (Vector): Các chỉ số PMI băng con/đồng pha.
+* **`nPorts`** (Int): Tổng số cổng ăng-ten.
+
+### Output
+* **Không có giá trị trả về (Void)**: Hàm sẽ thực hiện im lặng nếu tất cả dữ liệu đều hợp lệ. Nếu phát hiện lỗi (ví dụ: chỉ số index vượt quá giới hạn, sai kích thước vector), hàm sẽ ném ra lỗi (throw error) và dừng chương trình.
+
+### Ví dụ sử dụng
+
+__Input__
+
+```matlab
+% cfg.CodebookConfig.N1 = 4;
+% cfg.CodebookConfig.N2 = 1;
+% cfg.CodebookConfig.O1 = 4;
+% cfg.CodebookConfig.O2 = 1;
+% cfg.CodebookConfig.nPorts = 16;
+% cfg.CodebookConfig.codebookMode = 2;
+
+N1 = cfg.CodebookConfig.N1;
+N2 = cfg.CodebookConfig.N2;
+O1 = cfg.CodebookConfig.O1;
+O2 = cfg.CodebookConfig.O2;
+nPorts = cfg.CodebookConfig.nPorts;
+codebookMode = cfg.CodebookConfig.codebookMode;
+
+nLayers = 2;
+Ng = 2;
+
+i11 = 3;
+i12 = 0;
+i13 = 1;
+i14 = [1, 2];
+
+i2 = [0, 1, 0];
+
+i1 = {i11, i12, i13, i14};
+
+[i11, i12, i13, i14, i2] = computeInputs(nLayers, i1, i2, N2)
+
+validateInputs(codebookMode, nLayers, Ng, N1, N2, O1, O2, i11, i12, i13, i14, i2, nPorts);
+```
+
+---
+
+# computeBeam
+
+### Mô tả  
+Tính toán vector beam hai chiều cho **Type I Codebook – Single Panel** dựa trên các chỉ số beam theo chiều ngang và chiều dọc.  
+Hàm tạo vector steering cho từng chiều và kết hợp chúng bằng phép tích Kronecker để thu được vector beam hoàn chỉnh.
+
+### Input
+- `l`: chỉ số beam theo chiều ngang
+- `m`: chỉ số beam theo chiều dọc
+- `N1`: số phần tử anten theo chiều ngang
+- `N2`: số phần tử anten theo chiều dọc
+- `O1`: hệ số oversampling theo chiều ngang
+- `O2`: hệ số oversampling theo chiều dọc
+- `phaseFactor`: hệ số pha (±1) dùng trong biểu thức tạo beam
+
+### Output
+- `v`: vector beam phức có kích thước `(N1 × N2) × 1`
+
+### Ví dụ sử dụng
+
+__Input__
+
+```matlab
+v_lm = computeBeam(l, m, N1, N2, O1, O2, 2);
+```
+
+__Output__
+
+```matlab
+v_lm = [
+   1.0000 + 0.0000i
+   0.3827 + 0.9239i
+  -0.7071 + 0.7071i
+  -0.9239 - 0.3827i ]
+```
+
+---
+
+# calcWMatrixMultiPanel
+
+### Mô tả
+Hàm `calcWMatrixMultiPanel` tính toán một vector cột cụ thể (hoặc một phần của vector) cho ma trận tiền mã hóa trong cấu hình Multi-Panel. Hàm này thực hiện việc kết hợp vector chùm tia DFT ($v_{lm}$) với các hệ số pha (co-phasing) tương ứng với cấu trúc phân cực và vị trí của các panel ăng-ten để tạo ra các trọng số phức cuối cùng.
+
+### Input
+* **`p`** (Scalar/Complex): Hệ số đồng pha (co-phasing coefficient) hoặc chỉ số pha tương ứng.
+* **`n`** (Int): Tham số chỉ số (thường liên quan đến panel hiện tại hoặc chỉ số phân cực).
+* **`n_g`** (Int): Tổng số lượng panel ăng-ten ($N_g$).
+* **`idx1`** (Int): Tham số cấu hình nội bộ 1 (ví dụ: chỉ số phân cực hoặc nhóm).
+* **`idx2`** (Int): Tham số cấu hình nội bộ 2 (ví dụ: chỉ số thứ tự panel).
+* **`v_lm`** (Vector): Vector chùm tia DFT (Discrete Fourier Transform) cơ sở.
+* **`nPorts`** (Int): Tổng số cổng ăng-ten hệ thống.
+
+### Output
+* **`w_idx1`** (Vector): Vector cột trọng số phức (`double complex`).
+    * Kích thước: `nPorts` $\times$ 1.
+    * Đại diện cho một cột (hoặc một thành phần) của ma trận tiền mã hóa $W$.
+
+### Ví dụ sử dụng
+
+__Input__
+
+```matlab
+w_idx1 = calcWMatrixMultiPanel(p, n, n_g, 1, 2, v_lm, nPorts);
+```
+
+__Output__
+
+```matlab
+w_idx1 = [
+   0.2500 + 0.0000i
+   0.0957 + 0.2310i
+  -0.1768 + 0.1768i
+  -0.2310 - 0.0957i
+   0.2500 + 0.0000i
+   0.0957 + 0.2310i
+  -0.1768 + 0.1768i
+  -0.2310 - 0.0957i
+  -0.2500 + 0.0000i
+  -0.0957 - 0.2310i
+   0.1768 - 0.1768i
+   0.2310 + 0.0957i
+  -0.2500 + 0.0000i
+  -0.0957 - 0.2310i
+   0.1768 - 0.1768i
+   0.2310 + 0.0957i ]
+```
