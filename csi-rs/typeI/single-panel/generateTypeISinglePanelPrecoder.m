@@ -1,4 +1,4 @@
-function W = generateTypeISinglePanelPrecoder(nLayers, i1, i2)
+function W = generateTypeISinglePanelPrecoder(cfg, nLayers, i1, i2)
     N1 = cfg.CodebookConfig.N1;
     N2 = cfg.CodebookConfig.N2;
     O1 = cfg.CodebookConfig.O1;
@@ -6,13 +6,13 @@ function W = generateTypeISinglePanelPrecoder(nLayers, i1, i2)
     nPorts = cfg.CodebookConfig.nPorts;
     codebookMode = cfg.CodebookConfig.codebookMode;
 
-    validateInputs(NPorts, N1, N2, O1, O2);
+%     validateInputs(nPorts, N1, N2, O1, O2);
 
-    [i11, i12, i13, i2] = computeInputs(i1, i2, N2, nLayers) 
+    [i11, i12, i13, i2] = computeInputs(i1, i2, N2, nLayers);
 
     phiSet = [1, 1j, -1, -1j];
 
-    [l, m, lp, mp, lpp, mpp, lppp, mppp, p, n] = getBeamIndices(codebookMode, nLayers, i11, i12, i13, i2, N1, N2, O1, O2);
+    [l, m, lp, mp, lpp, mpp, lppp, mppp, p, n] = getBeamIndices(codebookMode, nPorts, nLayers, i11, i12, i13, i2, N1, N2, O1, O2);
 
     phi_n = phiSet(n+1);
     theta_p = exp(1j * pi * p / 4);
@@ -97,27 +97,27 @@ end
 
 %% --- HELPER FUNCTION ---
 
-function validateInputs(NPorts, N1, N2, O1, O2)
-    cfg = getValidCSIConfig();
-
-    isValid = false;
-
-    for k = 1:length(cfg)
-        if cfg(k).NPorts == NPorts && ...
-        cfg(k).N1 == N1 && cfg(k).N2 == N2 && ...
-        cfg(k).O1 == O1 && cfg(k).O2 == O2
-            isValid = true;
-            break;
-        end
-    end
-
-    if ~isValid
-        error(['Invalid CSI configuration!\n', ...
-            'NPorts = %d, (N1,N2) = (%d,%d), (O1,O2) = (%d,%d)\n', ...
-            'Check 3GPP TS 38.211 Type-I codebook.'], ...
-            NPorts, N1, N2, O1, O2);
-    end
-end
+% function validateInputs(NPorts, N1, N2, O1, O2)
+%     cfg = getValidCSIConfig();
+% 
+%     isValid = false;
+% 
+%     for k = 1:length(cfg)
+%         if cfg(k).NPorts == NPorts && ...
+%         cfg(k).N1 == N1 && cfg(k).N2 == N2 && ...
+%         cfg(k).O1 == O1 && cfg(k).O2 == O2
+%             isValid = true;
+%             break;
+%         end
+%     end
+% 
+%     if ~isValid
+%         error(['Invalid CSI configuration!\n', ...
+%             'NPorts = %d, (N1,N2) = (%d,%d), (O1,O2) = (%d,%d)\n', ...
+%             'Check 3GPP TS 38.211 Type-I codebook.'], ...
+%             NPorts, N1, N2, O1, O2);
+%     end
+% end
 
 function cfg = getValidCSIConfig()
     cfg = struct( ...
@@ -160,7 +160,7 @@ function [i11, i12, i13, i2] = computeInputs(i1, i2, N2, nLayers)
     end
 end
 
-function [l, m, lp, mp, lpp, mpp, lppp, mppp, p, n] = getBeamIndices(codebookMode, nLayers, i11, i12, i13, i2, N1, N2, O1, O2)
+function [l, m, lp, mp, lpp, mpp, lppp, mppp, p, n] = getBeamIndices(codebookMode, nPorts, nLayers, i11, i12, i13, i2, N1, N2, O1, O2)
     [l, m, lp, mp, lpp, mpp, lppp, mppp, p] = deal(0);
     
     % --- Table 5.2.2.2.1-5: Supported configurations of (N1,N2) and (O1,O2) ---

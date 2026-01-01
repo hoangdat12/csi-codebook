@@ -181,6 +181,28 @@ Kiểm tra tính hợp lệ của các tham số CSI do UE báo cáo.
 **Output**
 - Không có (chỉ thực hiện kiểm tra)
 
+**Example**
+
+__Input__
+```matlab
+% cfg.CodebookConfig.nLayers = 1;
+% cfg.CodebookConfig.N1 = 2;
+% cfg.CodebookConfig.N2 = 1;
+% cfg.CodebookConfig.O1 = 4;
+% cfg.CodebookConfig.O2 = 2; 
+% cfg.CodebookConfig.nPorts = 2 * cfg.CodebookConfig.N1 * cfg.CodebookConfig.N2; % 4 ports
+% cfg.CodebookConfig.codebookMode = 1;
+
+N1 = cfg.CodebookConfig.N1;
+N2 = cfg.CodebookConfig.N2;
+O1 = cfg.CodebookConfig.O1;
+O2 = cfg.CodebookConfig.O2;
+nPorts = cfg.CodebookConfig.nPorts;
+codebookMode = cfg.CodebookConfig.codebookMode;
+
+validateInputs(nPorts, N1, N2, O1, O2);
+```
+
 --- 
 
 ### computeInputs
@@ -203,8 +225,17 @@ Các chỉ số không áp dụng sẽ được gán bằng 0.
 **Example**
 
 __Input__
+```matlab
+[i11, i12, i13, i2] = computeInputs(i1, i2, N2, nLayers) ;
+```
 
 __Output__
+```matlab
+i11 = 0;
+i12 = 0;
+i13 = 0;
+i2  = 0;
+```
 
 ---
 
@@ -236,8 +267,23 @@ Hàm ánh xạ các chỉ số PMI (`i11`, `i12`, `i13`, `i2`) sang các chỉ s
 **Example**
 
 __Input__
+```matlab
+[l, m, lp, mp, lpp, mpp, lppp, mppp, p, n] = getBeamIndices(codebookMode, nPorts, nLayers, i11, i12, i13, i2, N1, N2, O1, O2);
+```
 
 __Output__
+```matlab
+l    = 0;
+m    = 0;
+lp   = 0;
+mp   = 0;
+lpp  = 0;
+mpp  = 0;
+lppp = 0;
+mppp = 0;
+p    = 0;
+n    = 0;
+```
 
 ---
 
@@ -257,14 +303,6 @@ Hàm ánh xạ `i13` sang các giá trị `(k1, k2)` theo các bảng quy địn
 **Output**
 - `k1`: độ lệch chỉ số beam theo chiều ngang
 - `k2`: độ lệch chỉ số beam theo chiều dọc
-
-**Example**
-
-__Input__
-
-__Output__
-
----
 
 ### computeBeam
 **Mô tả**  
@@ -286,8 +324,15 @@ Hàm tạo vector steering cho từng chiều và kết hợp chúng bằng phé
 **Example**
 
 __Input__
+```matlab
+v_lm = computeBeam(l, m, N1, N2, O1, O2, 2);
+```
 
 __Output__
+```matlab
+v_lm = [1
+        1]
+```
 
 --- 
 
@@ -307,8 +352,29 @@ Hàm thực hiện toàn bộ chuỗi xử lý từ kiểm tra tham số, trích
 **Example**
 
 __Input__
+```matlab
+cfg.CodebookConfig.nLayers = 1;
+cfg.CodebookConfig.N1 = 2;
+cfg.CodebookConfig.N2 = 1;
+cfg.CodebookConfig.O1 = 4;
+cfg.CodebookConfig.O2 = 2; 
+cfg.CodebookConfig.nPorts = 2 * cfg.CodebookConfig.N1 * cfg.CodebookConfig.N2; % 4 ports
+cfg.CodebookConfig.codebookMode = 1;
+
+i1 = {0, 0, 0, 0}; 
+i2 = 0;
+
+W = generateTypeISinglePanelPrecoder(cfg, cfg.CodebookConfig.nLayers, i1, i2);
+```
 
 __Output__
+```matlab
+W = [
+    0.5000
+    0.5000
+    0.5000
+    0.5000]
+```
 
 ---
 
