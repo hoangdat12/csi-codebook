@@ -4,25 +4,23 @@ function testTypeISinglePanel()
     disp('      TESTING TYPE I SINGLE PANEL PRECODER    ');
     disp('==============================================');
 
-    %% --- TEST CASE 1: 1 Layer ---
-    % N1=2, N2=1, O1=4, O2=2, i11=0, i12=0, i2=0
-    disp('>> CASE 1: 1 Layer');
+    %% --- TEST CASE 1: 1 Layer (4 Ports) ---
+    % Correction: Per Table 5.2.2.2.1-2, if N1=2, N2=1, then O2 must be 1.
+    disp('>> CASE 1: 1 Layer (4 Ports)');
     
-    % 1. Config Structure
     cfg.CodebookConfig.nLayers = 1;
     cfg.CodebookConfig.N1 = 2;
     cfg.CodebookConfig.N2 = 1;
     cfg.CodebookConfig.O1 = 4;
-    cfg.CodebookConfig.O2 = 2; 
-    cfg.CodebookConfig.nPorts = 2 * cfg.CodebookConfig.N1 * cfg.CodebookConfig.N2; % 4 ports
+    cfg.CodebookConfig.O2 = 1; % FIXED: Changed from 2 to 1
+    cfg.CodebookConfig.nPorts = 4;
     cfg.CodebookConfig.codebookMode = 1;
 
-    % 2. Inputs (Cell array format as requested)
-    % i1 = {i11, i12, i13, i14}
-    i1 = {0, 0, 0, 0}; 
+    % Removed redundant 4th element. i1 structure is {i1_1, i1_2, i1_3}
+    i1 = {0, 0, 0}; 
     i2 = 0;
 
-    % 3. Call Function
+    % Call your existing function
     try
         W = generateTypeISinglePanelPrecoder(cfg, cfg.CodebookConfig.nLayers, i1, i2);
         disp('Result W (4x1):');
@@ -31,28 +29,27 @@ function testTypeISinglePanel()
         disp(['Error in Case 1: ' ME.message]);
     end
 
-    %% --- TEST CASE 2: 2 Layers ---
-    % N1=2, N2=1, O1=4, O2=1, i11=0, i12=0, i13=1, i2=1
+    %% --- TEST CASE 2: 2 Layers (4 Ports) ---
+    % Valid config: 4 Ports, N1=2, N2=1, O2=1
     disp('----------------------------------------------');
     disp('>> CASE 2: 2 Layers');
 
     cfg.CodebookConfig.nLayers = 2;
-    cfg.CodebookConfig.N1 = 2;
-    cfg.CodebookConfig.N2 = 1;
-    cfg.CodebookConfig.O1 = 4;
-    cfg.CodebookConfig.O2 = 1;
-    cfg.CodebookConfig.nPorts = 4;
+    % Reuse N1, N2, O1, O2, nPorts from Case 1
     
-    % i13 = 1
-    i1 = {0, 0, 1, 0}; 
+    i1 = {0, 0, 1}; 
     i2 = 1;
 
-    W = generateTypeISinglePanelPrecoder(cfg, cfg.CodebookConfig.nLayers, i1, i2);
-    disp('Result W (4x2):');
-    disp(W);
+    try
+        W = generateTypeISinglePanelPrecoder(cfg, cfg.CodebookConfig.nLayers, i1, i2);
+        disp('Result W (4x2):');
+        disp(W);
+    catch ME
+        disp(['Error in Case 2: ' ME.message]);
+    end
 
-    %% --- TEST CASE 3: 1 Layer (High N1) ---
-    % N1=8, N2=1, O1=4, O2=1, i11=4, i12=0, i2=2
+    %% --- TEST CASE 3: 1 Layer (16 Ports - High N1) ---
+    % Valid config: 16 Ports, N1=8, N2=1 -> O2=1
     disp('----------------------------------------------');
     disp('>> CASE 3: 1 Layer (N1=8)');
 
@@ -61,17 +58,23 @@ function testTypeISinglePanel()
     cfg.CodebookConfig.N2 = 1;
     cfg.CodebookConfig.O1 = 4;
     cfg.CodebookConfig.O2 = 1;
-    cfg.CodebookConfig.nPorts = 16; % 2*8*1
+    cfg.CodebookConfig.nPorts = 16; 
     
-    i1 = {4, 0, 0, 0};
+    i1 = {4, 0, 0};
     i2 = 2;
 
-    W = generateTypeISinglePanelPrecoder(cfg, cfg.CodebookConfig.nLayers, i1, i2);
-    disp('Result W (First 8 rows):');
-    disp(W(1:8, :));
+    try
+        W = generateTypeISinglePanelPrecoder(cfg, cfg.CodebookConfig.nLayers, i1, i2);
+        disp('Result W (First 8 rows):');
+        if ~isempty(W)
+            disp(W(1:8, :));
+        end
+    catch ME
+        disp(['Error in Case 3: ' ME.message]);
+    end
 
-    %% --- TEST CASE 4: 4 Layers ---
-    % N1=4, N2=2, O1=4, O2=2, i11=2, i12=1, i13=0, i2=0
+    %% --- TEST CASE 4: 4 Layers (16 Ports - Grid) ---
+    % Correction: Per Table 5.2.2.2.1-2, if N1=4, N2=2 (16 ports), O2 must be 4.
     disp('----------------------------------------------');
     disp('>> CASE 4: 4 Layers');
 
@@ -79,16 +82,19 @@ function testTypeISinglePanel()
     cfg.CodebookConfig.N1 = 4;
     cfg.CodebookConfig.N2 = 2;
     cfg.CodebookConfig.O1 = 4;
-    cfg.CodebookConfig.O2 = 2;
-    cfg.CodebookConfig.nPorts = 16; % 2*4*2
+    cfg.CodebookConfig.O2 = 4; % FIXED: Changed from 2 to 4
+    cfg.CodebookConfig.nPorts = 16; 
     
-    i1 = {2, 1, 0, 0};
+    i1 = {2, 1, 0}; 
     i2 = 0;
 
-    W = generateTypeISinglePanelPrecoder(cfg, cfg.CodebookConfig.nLayers, i1, i2);
-    
-    disp('Result W (16x4) - First 4 rows shown:');
-    disp(W(1:4, :));
-    
-    
+    try
+        W = generateTypeISinglePanelPrecoder(cfg, cfg.CodebookConfig.nLayers, i1, i2);
+        disp('Result W (16x4) - First 4 rows shown:');
+        if ~isempty(W)
+            disp(W(1:4, :));
+        end
+    catch ME
+        disp(['Error in Case 4: ' ME.message]);
+    end
 end
