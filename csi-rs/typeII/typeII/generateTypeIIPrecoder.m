@@ -36,7 +36,7 @@ function W = generateTypeIIPrecoder(cfg, i1, i2)
 
     % --- 5. Map Indices to Physical Amplitude Values ---
     % Converts indices k^(1), k^(2) into physical values p^(1), p^(2).
-    [p1_li, p2_li] = mappingAmplitudesK1K2ToP1P2(i14, i22);
+    [p1_li, p2_li] = mappingAmplitudesK1K2ToP1P2(i14, i22)
 
     % --- 6. Compute Phase Coefficients (Phi) ---
     % Converts indices c_li into complex phase values.
@@ -219,31 +219,41 @@ function [i11, i12, i13, i14, i21, i22] = computeInputs(L, i1_cell, i2_cell, sub
              i21(l, phase_pos(1:num_phase)) = i21_reported(l, 1:num_phase);
         end
 
-        % -- Step D: i2,2 (Subband Amplitude) --
-        % Only execute if subbandAmplitude is TRUE
+        % Step C: Subband Amplitude Logic
         if subbandAmplitude && ~isempty(i22_reported)
             
+            % 1. Strongest Beam luôn là 1 (Không nằm trong i22_reported)
             i22(l, strong_idx) = 1; 
             
             candidates = setdiff(non_zero_idx, strong_idx);
             
             if ~isempty(candidates)
-                % --- PRIORITY SORTING (Tie-breaking) ---
-                % Rule: Sort Amplitude Descending. Tie-break: Index Ascending (min(x,y)).
-                % Logic: Sort [Amp, -Index] descending.
+                % --- BƯỚC 1: LỌC (SELECTION) ---
+                % Mục đích: Tìm ra top (K2-1) thằng mạnh nhất để báo cáo.
+                % Logic: Sort Amplitude Descending. Tie-break: Index Ascending.
+                
                 sort_mat = [i14(l, candidates)', -candidates']; 
                 [~, order] = sortrows(sort_mat, 'descend');
-                sorted_cand = candidates(order);
+                sorted_cand_by_strength = candidates(order); % Danh sách xếp theo độ mạnh
 
                 M_l = length(non_zero_idx);
                 num_sb = min(M_l, K2) - 1;
                 
                 if num_sb > 0
-                    sb_pos = sorted_cand(1:num_sb);
+                    % Lấy danh sách index của những thằng được chọn
+                    chosen_indices = sorted_cand_by_strength(1:num_sb);
                     
-                    actual_sb_len = min(num_sb, size(i22_reported, 2));
-                    i22(l, sb_pos(1:actual_sb_len)) = i22_reported(l, 1:actual_sb_len);
+                    % --- BƯỚC 2: SẮP XẾP LẠI THEO INDEX (RE-ORDERING) --- (FIXED HERE)
+                    % Bit stream i22_reported luôn map theo thứ tự index tăng dần của các port được chọn
+                    target_indices = sort(chosen_indices, 'ascend');
+                    
+                    % --- BƯỚC 3: MAPPING ---
+                    % Gán lần lượt bit báo cáo vào các index đã sắp xếp
+                    len_fill = min(num_sb, size(i22_reported, 2));
+                    i22(l, target_indices(1:len_fill)) = i22_reported(l, 1:len_fill);
                 end
+                
+                % Các thằng còn lại (Yếu + Zero) giữ nguyên giá trị khởi tạo là 1.
             end
         end
     end
@@ -445,7 +455,6 @@ function [p1_li, p2_li] = mappingAmplitudesK1K2ToP1P2(i14, i22)
 % OUTPUTS:
 %   p1_li : Physical wideband amplitudes p^(1).
 %   p2_li : Physical subband amplitudes p^(2).
-
     [numRows, numCols] = size(i14);
     
     p1_li = zeros(numRows, numCols);
@@ -589,5 +598,5 @@ function W = computePrecodingMatrix(l, L, N1, N2, O1, O2, n1, n2, p1, p2, phi, i
 
     % 5. Concatenate and Normalize
     % W = [W_pol1; W_pol2] / Normalization
-    W = (1 / norm_factor) * [sum_first_matrix; sum_second_matrix];
+    W = (1 / norm_factor) * [sum_first_matrix sum_second_matrix];
 end

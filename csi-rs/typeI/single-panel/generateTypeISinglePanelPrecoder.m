@@ -4,7 +4,7 @@ function W = generateTypeISinglePanelPrecoder(cfg, nLayers, i1, i2)
     N2 = cfg.CodebookConfig.N2;
     O1 = cfg.CodebookConfig.O1;
     O2 = cfg.CodebookConfig.O2;
-    nPorts = cfg.CodebookConfig.nPorts;
+    nPorts = 2*N1*N2;
     codebookMode = cfg.CodebookConfig.codebookMode;
 
     validateInputs(nPorts, N1, N2, O1, O2);
@@ -68,7 +68,7 @@ function W = generateTypeISinglePanelPrecoder(cfg, nLayers, i1, i2)
 
     switch nLayers
         case 1
-            v_lm = computeBeam(l, m, N1, N2, O1, O2, 2); % Standard 2*pi phase
+            v_lm = computeBeam(l, m, N1, N2, O1, O2, 2)
 
             W = (1/sqrt(nPorts)) * [v_lm; ...
                                     phi_n * v_lm];
@@ -517,7 +517,7 @@ function v = computeBeam(l, m, N1, N2, O1, O2, phaseFactor)
     % Kronecker product of the 1st dim vector and 2nd dim vector.
     n1 = (0:N1-1).';
     u_n1 = exp(1j * phaseFactor * pi * l * n1 / (O1 * N1));
-  
+    
     % --- Compute v_{l,m} ---
     v = kron(u_n1, u_n2);
 end

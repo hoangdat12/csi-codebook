@@ -1,28 +1,26 @@
-cfg = struct();
+% cfg = struct();
 
-cfg.CodebookConfig.N1 = 4;
-cfg.CodebookConfig.N2 = 4;
-cfg.CodebookConfig.O1 = 4;
-cfg.CodebookConfig.O2 = 4;
+% cfg.CodebookConfig.N1 = 4;
+% cfg.CodebookConfig.N2 = 4;
+% cfg.CodebookConfig.O1 = 4;
+% cfg.CodebookConfig.O2 = 4;
 
-cfg.CodebookConfig.NumberOfBeams = 4;     % L
-cfg.CodebookConfig.PhaseAlphabetSize = 8; % NPSK
-cfg.CodebookConfig.SubbandAmplitude = true;
-cfg.CodebookConfig.numLayers = 2;         % nLayers
+% cfg.CodebookConfig.NumberOfBeams = 4;     % L
+% cfg.CodebookConfig.PhaseAlphabetSize = 8; % NPSK
+% cfg.CodebookConfig.SubbandAmplitude = true;
+% cfg.CodebookConfig.numLayers = 2;         % nLayers
 
-i11 = [2, 1];
-i12 = [2];
-i13 = [3, 1];
-i14 = [4, 6, 5, 0, 2, 3, 1 ; 3, 2, 4, 1, 5, 6, 0];
-i21 = [1, 3, 4, 2, 5, 7 ; 2, 0, 5, 1, 4, 6];
-i22 = [0, 1, 0, 1, 0 ; 1, 1, 0, 0, 1];
+% i11 = [2, 1];
+% i12 = [2];
+% i13 = [3, 1];
+% i14 = [4, 6, 5, 0, 2, 3, 1 ; 3, 2, 4, 1, 5, 6, 0];
+% i21 = [1, 3, 4, 2, 5, 7 ; 2, 0, 5, 1, 4, 6];
+% i22 = [0, 1, 0, 1, 0 ; 1, 1, 0, 0, 1];
 
-i1 = {i11, i12, i13, i14};
-i2 = {i21, i22};
+% i1 = {i11, i12, i13, i14};
+% i2 = {i21, i22};
 
-W = generateTypeIIPrecoder(cfg, i1, i2)
-
-% W =
+% W = generateTypeIIPrecoder(cfg, i1, i2)
 
 %    0.0444 + 0.0728i   0.1286 + 0.0000i
 %    0.0394 - 0.0317i   0.0369 - 0.1485i
@@ -56,3 +54,28 @@ W = generateTypeIIPrecoder(cfg, i1, i2)
 %   -0.0224 + 0.0542i  -0.1234 - 0.0184i
 %    0.0415 + 0.0415i  -0.0482 + 0.0909i
 %    0.0542 - 0.0224i   0.0445 + 0.0880i
+
+%% Case 2
+cfg = struct();
+
+cfg.CodebookConfig.N1 = 4;
+cfg.CodebookConfig.N2 = 2;
+cfg.CodebookConfig.O1 = 4;
+cfg.CodebookConfig.O2 = 4;
+
+cfg.CodebookConfig.NumberOfBeams = 4;     % L
+cfg.CodebookConfig.PhaseAlphabetSize = 8; % NPSK
+cfg.CodebookConfig.SubbandAmplitude = true;
+cfg.CodebookConfig.numLayers = 1;         % nLayers
+
+i11 = [2, 1];
+i12 = [55];
+i13 = [4];
+i14 = [4, 5, 6, 0, 2, 1, 0];
+i21 = [4, 6, 1, 2];
+i22 = [1, 1, 0, 0];
+
+i1 = {i11, i12, i13, i14};
+i2 = {i21, i22};
+
+W = generateTypeIIPrecoder(cfg, i1, i2);

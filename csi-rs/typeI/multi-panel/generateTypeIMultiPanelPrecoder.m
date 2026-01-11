@@ -6,7 +6,7 @@ function W = generateTypeIMultiPanelPrecoder(cfg, nLayers, n_g, i1, i2)
     N2 = cfg.CodebookConfig.N2;
     O1 = cfg.CodebookConfig.O1;
     O2 = cfg.CodebookConfig.O2;
-    nPorts = cfg.CodebookConfig.nPorts;         % Total number of CSI-RS ports
+    nPorts = 2*n_g*N1*N2;
     codebookMode = cfg.CodebookConfig.codebookMode; % Mode 1 or Mode 2
 
     % Parse Input Indices (PMI)
@@ -386,7 +386,7 @@ function phi_n = computePhiN(n)
 end
 
 function phi_p = computePhiP(p)
-    phi_p = exp(1j*pi*p/4);
+    phi_p = exp(1j*pi*p/2);
 end
 
 function a_p = computeAP(p)
@@ -405,7 +405,7 @@ function W = calcWMatrixMultiPanel(p, n, Ng, idxRank, rank, vLm, nPorts)
         if rank == 1
             % Based on W^{x, 2, 1} formulas
             phi_p1 = computePhiP(p(1)); 
-            phi_n  = computePhiN(n); 
+            phi_n  = computePhiN(n(1)); 
             
             if idxRank == 1
                 W = norm_factors * [vLm; phi_n*vLm; phi_p1*vLm; phi_n*phi_p1*vLm];
@@ -432,7 +432,7 @@ function W = calcWMatrixMultiPanel(p, n, Ng, idxRank, rank, vLm, nPorts)
 
     elseif Ng == 4
         % Based on W^{x, 4, 1} formulas
-        phi_n = computePhiN(n); 
+        phi_n = computePhiN(n(1)); 
         phi_p1 = computePhiP(p(1));
         phi_p2 = computePhiP(p(2));
         phi_p3 = computePhiP(p(3));
