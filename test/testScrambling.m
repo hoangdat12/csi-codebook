@@ -1,3 +1,5 @@
+setupPath();
+
 %% ------- Test 1 --------
 clc; clear;
 

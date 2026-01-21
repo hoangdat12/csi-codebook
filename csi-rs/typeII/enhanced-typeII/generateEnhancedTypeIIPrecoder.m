@@ -215,7 +215,6 @@ function [i11, i12, i15, i16, i17, i18, i23, i24, i25] = computeInputs(i1, i2, n
 %       i24     : Subband Amplitude [nLayers x 2L x Mv] (Full matrix)
 %       i25     : Subband Phase [nLayers x 2L x Mv] (Full matrix)
 
-    %% --- PART 1: EXTRACT DATA FROM PART 1 (i1) ---
     % i1 thường chứa: {i11, i12, [i15], i16, i17, i18}
     % Cấu trúc thay đổi tùy thuộc vào N3 (<=19 hoặc >19)    
     i11 = i1{1};
@@ -244,7 +243,6 @@ function [i11, i12, i15, i16, i17, i18, i23, i24, i25] = computeInputs(i1, i2, n
     i17 = i17Reported;
     i18 = i18Reported;
 
-    %% --- PART 2: EXTRACT DATA FROM PART 2 (i2) ---
     % i2 chứa: {i23 (Compressed), i24 (Stream), i25 (Stream)}
     
     i23Reported = i2{1};      % Wideband Amp: Chỉ báo 1 giá trị/layer (cho pol yếu)
@@ -255,7 +253,6 @@ function [i11, i12, i15, i16, i17, i18, i23, i24, i25] = computeInputs(i1, i2, n
     if ~iscell(i24Reported), i24Reported = num2cell(i24Reported, 2); end
     if ~iscell(i25Reported), i25Reported = num2cell(i25Reported, 2); end
 
-    %% --- PART 3: RECONSTRUCTION / DECOMPRESSION ---
     
     % Khởi tạo ma trận kết quả
     i24 = zeros(nLayers, 2*L, Mv);

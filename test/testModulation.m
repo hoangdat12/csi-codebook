@@ -1,3 +1,5 @@
+setupPath();
+
 %% -------- Test 1 - Pi/2-BPSK ---------
 bits = randi([0 1], N, 1);
 

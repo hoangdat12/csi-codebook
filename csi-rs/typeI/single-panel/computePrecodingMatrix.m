@@ -14,7 +14,6 @@
 %   for each transmission layer.
 % ---------------------------------------------------------
 
-
 numberOfLayers = 4;
 numberOfPorts = 16;
 folderName = 'pmiData';
