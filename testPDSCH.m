@@ -4,7 +4,7 @@ setupPath();
 inputLen = 1000;
 inputBits = randi([0 1], inputLen, 1, 'int8'); 
 
-pdsch = customPDSCHConfig;
+pdsch = nrPDSCHConfig;
 carrier = nrCarrierConfig;
 
 % Precoding Matrix Parameters
@@ -36,7 +36,7 @@ bitRates = 1/3;
 
 crcEncoded = nrCRCEncode(inputBits, '16');
 
-bgn = baseGraphSelection(crcEncoded, bitRates); 
+bgn = 2; 
 
 cbs = nrCodeBlockSegmentLDPC(crcEncoded, bgn);
 
@@ -90,4 +90,3 @@ disp(size(sym));
 
 [portind,indinfo] = nrPDSCHIndices(carrier,pdsch);
 [antsym,antind] = nrPDSCHPrecode(carrier,portsym,portind,W);
-
