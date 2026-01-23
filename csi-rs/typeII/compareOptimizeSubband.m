@@ -52,7 +52,7 @@ outputFolder = 'compareTables';
 % Npsk = {4, 8}
 Npsk = 4;
 % Npsk = {1, ..., 2L - 1}
-Ml = 4;
+Ml = 3;
 subbandAmplitude = false;
 
 % -----------------------------------------------------------

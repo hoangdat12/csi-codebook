@@ -94,44 +94,72 @@ classdef customPDSCHConfig < nrPDSCHConfig
             end
         end
 
+        function [totalPTRS_RE] = calculateManualPTRSCount(obj)
+            if ~obj.EnablePTRS
+                totalPTRS_RE = 0;
+                return;
+            end
+        end
+    end
+
+    methods (Access = public)
+
         function [G] = calculateManualG(obj)
+            % --- 1. Basic Config ---
             numPRB = length(obj.PRBSet);
-            numSymbols = obj.SymbolAllocation(2); 
-
-            % Total RE allocation
-            totalAllocationRE = numPRB * 12 * numSymbols;
-
-            % Total DMRS occupied
+            numLayers = obj.NumLayers; 
             dmrsConfig = obj.DMRS;
+            nSC = 12; 
+            pdschLen = obj.SymbolAllocation(2);
 
-            dmrsConfigType = dmrsConfig.DMRSConfigurationType;
-            dmrsMaxLength = dmrsConfig.DMRSLength;
-            dmrsAdditionalPosition = dmrsConfig.DMRSAdditionalPosition;
+            % --- 2. DMRS Symbol Count ---
+            configAddPos = dmrsConfig.DMRSAdditionalPosition;
+            if pdschLen < 4, m=0; elseif pdschLen < 8, m=1; elseif pdschLen < 10, m=2; else, m=3; end
+            actualAddPos = min(configAddPos, m);
+            numDMRSSymbols = 1 + actualAddPos; 
+            if dmrsConfig.DMRSLength == 2, numDMRSSymbols = numDMRSSymbols * 2; end
             
-            if dmrsConfigType == 1
-                rePerGroup = 6;
-            elseif dmrsConfigType == 2
-                rePerGroup = 4;
+            % --- 3. DMRS Overhead Per PRB ---
+            cdmGroups = dmrsConfig.NumCDMGroupsWithoutData;
+            if dmrsConfig.DMRSConfigurationType == 1, ov=6; else, ov=4; end
+            overheadPerSym = cdmGroups * ov;
+            dmrsOverhead_PerPRB = overheadPerSym * numDMRSSymbols;
+
+            % --- 4. Calculate Total Reserved REs (Intersect logic) ---
+            if isempty(obj.ReservedRE)
+                numReversedRE = 0;
             else
-                error('Invalid DMRS config type');
+                maxWidth = max(obj.PRBSet) * 12 + 1000;
+                [k_res, l_res] = ind2sub([maxWidth, 14], obj.ReservedRE);
+                
+                min_k = min(obj.PRBSet) * 12 + 1;
+                max_k = (max(obj.PRBSet) + 1) * 12;
+                min_l = obj.SymbolAllocation(1) + 1; 
+                max_l = obj.SymbolAllocation(1) + obj.SymbolAllocation(2);
+                
+                valid_k = (k_res >= min_k) & (k_res <= max_k);
+                valid_l = (l_res >= min_l) & (l_res <= max_l);
+                
+                numReversedRE = sum(valid_k & valid_l);
             end
 
-            rePerRBPerSymbol = rePerGroup * dmrsConfig.NumCDMGroupsWithoutData;
+            % --- 5. Per PRB Calculation (FIXED HERE) ---
+            totalRE_OnePRB = nSC * pdschLen;
+            
+            reAvailable_OnePRB = totalRE_OnePRB - dmrsOverhead_PerPRB; 
 
-            % Number of DMRS symbols in time
-            % Base symbol = 1
-            % additionalPosition adds more
-            totalDmrSymbols = (1 + dmrsAdditionalPosition) * dmrsMaxLength;
+            % Apply 3GPP Rule (Floor 156)
+            reData_PerPRB = min(156, reAvailable_OnePRB);
+            
+            % --- 6. Total Calculation ---
+            totalReForPDSCH = reData_PerPRB * numPRB * numLayers;
+            
+            % --- 7. Subtract Holes (Reserved & PTRS) ---
+            [totalPTRS_RE] = calculateManualPTRSCount(obj);
+            
+            totalReForPDSCH = totalReForPDSCH - totalPTRS_RE - numReversedRE;
 
-            % Total DMRS RE
-            totalREOfDMRS = numPRB* totalDmrSymbols * rePerRBPerSymbol;
-
-            % Total PTRS occupied
-
-            % Total Reversed RE
-
-            % Total ...
-
+            % --- 8. Final G ---
             switch obj.Modulation
                 case 'QPSK',    Qm = 2;
                 case '16QAM',   Qm = 4;
@@ -141,14 +169,7 @@ classdef customPDSCHConfig < nrPDSCHConfig
                 otherwise,      Qm = 2;
             end
 
-            % Total RE for PDSCH
-            totalDataRE = totalAllocationRE - totalREOfDMRS;
-
-            % The total RE is limited by min(156, totalDataRE)
-            totalDataREActual = min(156, totalDataRE);
-
-            % The maximum bit
-            G = totalDataREActual * Qm;
+            G = totalReForPDSCH * Qm;
         end
         
     end
