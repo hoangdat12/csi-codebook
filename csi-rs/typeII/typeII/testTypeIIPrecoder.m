@@ -1,25 +1,25 @@
 % cfg = struct();
-
+% 
 % cfg.CodebookConfig.N1 = 4;
 % cfg.CodebookConfig.N2 = 4;
 % cfg.CodebookConfig.O1 = 4;
 % cfg.CodebookConfig.O2 = 4;
-
+% 
 % cfg.CodebookConfig.NumberOfBeams = 4;     % L
 % cfg.CodebookConfig.PhaseAlphabetSize = 8; % NPSK
 % cfg.CodebookConfig.SubbandAmplitude = true;
 % cfg.CodebookConfig.numLayers = 2;         % nLayers
-
+% 
 % i11 = [2, 1];
 % i12 = [2];
 % i13 = [3, 1];
 % i14 = [4, 6, 5, 0, 2, 3, 1 ; 3, 2, 4, 1, 5, 6, 0];
 % i21 = [1, 3, 4, 2, 5, 7 ; 2, 0, 5, 1, 4, 6];
 % i22 = [0, 1, 0, 1, 0 ; 1, 1, 0, 0, 1];
-
+% 
 % i1 = {i11, i12, i13, i14};
 % i2 = {i21, i22};
-
+% 
 % W = generateTypeIIPrecoder(cfg, i1, i2)
 
 %    0.0444 + 0.0728i   0.1286 + 0.0000i
@@ -78,4 +78,4 @@ i22 = [1, 1, 0, 0];
 i1 = {i11, i12, i13, i14};
 i2 = {i21, i22};
 
-W = generateTypeIIPrecoder(cfg, i1, i2);
+W = generateTypeIIPrecoder(cfg, i1, i2)

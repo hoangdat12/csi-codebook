@@ -36,7 +36,7 @@ function W = generateTypeIIPrecoder(cfg, i1, i2)
 
     % --- 5. Map Indices to Physical Amplitude Values ---
     % Converts indices k^(1), k^(2) into physical values p^(1), p^(2).
-    [p1_li, p2_li] = mappingAmplitudesK1K2ToP1P2(i14, i22)
+    [p1_li, p2_li] = mappingAmplitudesK1K2ToP1P2(i14, i22);
 
     % --- 6. Compute Phase Coefficients (Phi) ---
     % Converts indices c_li into complex phase values.
@@ -598,5 +598,5 @@ function W = computePrecodingMatrix(l, L, N1, N2, O1, O2, n1, n2, p1, p2, phi, i
 
     % 5. Concatenate and Normalize
     % W = [W_pol1; W_pol2] / Normalization
-    W = (1 / norm_factor) * [sum_first_matrix sum_second_matrix];
+    W = (1 / norm_factor) * [sum_first_matrix; sum_second_matrix];
 end

@@ -1,11 +1,8 @@
 function outSignals = pdsch(inputBits, pdschConfig, carrierConfig)
-
     % Get config parameter
     targetCodeRate = pdschConfig.TargetCodeRate;
     rv = pdschConfig.RedundancyVersion;
     nLayers = pdschConfig.NumLayers;
-    nID = pdschConfig.NID;
-    nRNTI = pdschConfig.RNTI;
     
     switch pdschConfig.Modulation
         case 'QPSK',   Qm = 2;
@@ -45,7 +42,14 @@ function outSignals = pdsch(inputBits, pdschConfig, carrierConfig)
     codeBlockConcatenation = concentration(rmBitsCell);
 
     % Scrambling
-    c_init = double(nRNTI) * 2^15 + q * 2^14 + double(nID);
+    if isempty(pdschConfig.NID)
+        nid = carrierConfig.NCellID;
+    else
+        nid = pdschConfig.NID(1);
+    end
+    rnti = pdschConfig.RNTI;
+
+    c_init = (double(rnti) * 2^15) + (double(0) * 2^14) + double(nid);
     scrambledBits = scrambling(codeBlockConcatenation, c_init);
 
     % Modulation
@@ -54,22 +58,40 @@ function outSignals = pdsch(inputBits, pdschConfig, carrierConfig)
     % Layer Mapping
     layersMappedSymbols = layerMapping(modSymbols, nLayers);
 
-    % Get codebook config
-    cbConfig = pdschConfig.CodebookConfig;
-    
-    % Identify the number of antenna
-    if isfield(cbConfig, 'n1')
-        nTxAnts = 2 * cbConfig.n1 * cbConfig.n2;
-    else
-        nTxAnts = nLayers; 
-    end
-    
-    % Compute Precoding Matrix
-    W = getPrecodingMatrix(cbConfig, PMI, nLayers, nTxAnts);
-    
-    % Port Mapping
-    antennaPortMappedSyms = layersMappedSymbols * W.';
+    cfg = struct();
+    cfg.CodebookConfig.N1 = 4;
+    cfg.CodebookConfig.N2 = 2;
+    cfg.CodebookConfig.O1 = 4;
+    cfg.CodebookConfig.O2 = 4;
+    cfg.CodebookConfig.NumberOfBeams = 4; % L = 4
+    cfg.CodebookConfig.PhaseAlphabetSize = 8; % Npsk = 8
+    cfg.CodebookConfig.SubbandAmplitude = true;
+    cfg.CodebookConfig.numLayers = nLayers;
+
+    % -----------------------------------------------------------
+    % PMI Report simulation from UE
+    % i1: Wideband indices (spatial beams)
+    % i2: Subband indices (co-phasing and amplitude)
+    % -----------------------------------------------------------
+    i11 = [2, 1];
+    i12 = 2;
+    i13 = [3, 1];
+    i14 = [4, 6, 5, 0, 2, 3, 1 ; 3, 2, 4, 1, 5, 6, 0];
+    i21 = [1, 3, 4, 2, 5, 7 ; 2, 0, 5, 1, 4, 6];
+    i22 = [0, 1, 0, 1, 0 ; 1, 1, 0, 0, 1];
+
+    i1 = {i11, i12, i13, i14};
+    i2 = {i21, i22};
+
+    % -----------------------------------------------------------
+    % PRECODING MATRIX GENERATION
+    % Matrix W dimensions: [numberOfPorts x nLayers] -> [16 x 2]
+    % Type II Precoding creates a non-orthogonal matrix.
+    % -----------------------------------------------------------
+    W = generateTypeIIPrecoder(cfg, i1, i2);
+
+    precoded = precoding(layersMappedSymbols, W);
     
     % Output
-    outSignals = antennaPortMappedSyms;
+    outSignals = precoded;
 end
