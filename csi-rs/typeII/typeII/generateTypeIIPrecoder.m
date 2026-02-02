@@ -1,4 +1,4 @@
-function W = generateTypeIIPrecoder(cfg, i1, i2)
+function W = generateTypeIIPrecoder(cfg, i1, i2, isFormatedPMI)
 % GENERATETYPEIIPRECODER Main driver for Type II (Basic) CSI Codebook generation.
 %   Integrates input reconstruction, basis calculation, coefficient mapping,
 %   and final linear combination to produce the Precoding Matrix W.
@@ -10,6 +10,10 @@ function W = generateTypeIIPrecoder(cfg, i1, i2)
 %
 % OUTPUT:
 %   W   : Precoding Matrix [nPorts x nLayers].
+
+    if nargin < 4
+        isFormatedPMI = false;
+    end
 
     % --- 1. Extract Configuration Variables ---
     N1 = cfg.CodebookConfig.N1;
@@ -28,7 +32,12 @@ function W = generateTypeIIPrecoder(cfg, i1, i2)
     % --- 3. Reconstruct Codebook Indices ---
     % Unpacks the reported indices. 
     % Note: i12 is specific to "Type II Basic" for orthogonal basis selection.
-    [i11, i12, ~, i14, i21, i22] = computeInputs(L, i1, i2, sbAmplitude);
+
+    if isFormatedPMI
+        [i11, i12, ~, i14, i21, i22] = extractInputs(i1, i2);
+    else
+        [i11, i12, ~, i14, i21, i22] = computeInputs(L, i1, i2, sbAmplitude);
+    end
 
     % --- 4. Compute Orthogonal Basis Vectors (n1, n2) ---
     % Decodes the combinatorial coefficient i1,2 into basis vectors.
@@ -119,6 +128,16 @@ function validateInputs(nLayers, sbAmplitude, i1, i2)
             warning("When Subband Amplitude is FALSE, i2 must contain only 1 Cell element {i21}.");
         end
     end
+end
+
+function [i11, i12, i13, i14, i21, i22] = extractInputs(i1, i2)
+    i11 = i1{1};
+    i12 = i1{2};
+    i13 = i1{3};
+    i14 = i1{4};
+
+    i21 = i2{1};
+    i22 = i2{2};
 end
 
 % i11 = [2, 1]; i12 = [2]; i13 = [3, 1]; 
@@ -252,12 +271,12 @@ function [i11, i12, i13, i14, i21, i22] = computeInputs(L, i1_cell, i2_cell, sub
                     len_fill = min(num_sb, size(i22_reported, 2));
                     i22(l, target_indices(1:len_fill)) = i22_reported(l, 1:len_fill);
                 end
-                
-                % Các thằng còn lại (Yếu + Zero) giữ nguyên giá trị khởi tạo là 1.
             end
         end
     end
 end
+
+
 
 % i22l = [0, 1, 1, 0, 1, 1, 0, 1];
 % Kli1 = [4, 6, 7, 5, 0, 2, 3, 1], Ml = 7, K2 = 6, Cli = [1, 3, 0, 2, 0, 0, 1, 2], Npsk = 8;

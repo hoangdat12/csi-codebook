@@ -2,233 +2,302 @@ clear; clc; close all;
 
 setupPath();
 
-Num_UEs = 100; 
-nlayers_per_ue = 2; 
-Max_Total_Layers = 4; 
+% -----------------------------------------------------------------
+% Configuration Parameters
+% -----------------------------------------------------------------
+nLayers = 2;
+SNR_dB = 20;
+NumUEs = 10;
+nTxAnts = 8;                
+nRxAnts = 2;                 
+sampleRate = 61440000;        
+% Orthogonal => Best Pair PMI
+% Non-Orthogonal => Worst Pair PMI
+comparisionCase = "Orthogonal";
 
-gNB_Params.NumAntennas = 16;
-Target_Num_Users = Max_Total_Layers / nlayers_per_ue; 
+% The value based on the Table 5.1.3.1 - 138 214
+% 11 -> 64QAM & 466/1024 Target code Rate
+% 6 -> 16QAM & 434/1024 Target code Rate
+MSCReport = 6;
 
-pdsch_cfg = customPDSCHConfig(); 
-cfg_base = struct('N1',4, 'N2',2, 'O1',4, 'O2',4, 'NumberOfBeams',4, ...
-                  'PhaseAlphabetSize',8, 'SubbandAmplitude',true, 'numLayers',nlayers_per_ue);
-pdsch_cfg.CodebookConfig = cfg_base;
-pdsch_cfg.PRBSet = 0:51;
-
-All_UE_Feedback = cell(1, Num_UEs);
-
-fprintf('--- Đang sinh Type II Feedback cho %d UEs (Mỗi UE %d Layers) ---\n', Num_UEs, nlayers_per_ue);
-
-for u = 1:Num_UEs
-    rand_i11 = [randi([0 15]), randi([0 7])];
-    rand_i12 = randi([0 3]); 
-    pdsch_cfg.Indices.i1 = {rand_i11, rand_i12, [3, 1], [4 6 5 0 2 3 1; 3 2 4 1 5 6 0]};
-    pdsch_cfg.Indices.i2 = {[1 3 4 2 5 7; 2 0 5 1 4 6], [0 1 0 1 0; 1 1 0 0 1]};
-    
-    try
-        W = generateTypeIIPrecoder(pdsch_cfg, pdsch_cfg.Indices.i1, pdsch_cfg.Indices.i2);
-    catch
-        W = randn(16, nlayers_per_ue) + 1i*randn(16, nlayers_per_ue);
-    end
-    
-    W = W ./ vecnorm(W);
-    All_UE_Feedback{u} = W;
+% Threadhold for identify PMI Pair
+if nLayers == 2
+    THREAD_HOLD = 1e-15;
+elseif nLayers == 3
+    THREAD_HOLD = 1e-2;
+else
+    THREAD_HOLD = 1e-2;
 end
 
-fprintf('\n--- Đang chạy Block SUS (Function của bạn) ---\n');
+% Csi Config
+csiConfig = nrCSIRSConfig;
+csiConfig.CSIRSType = {'nzp'};
+% https://www.etsi.org/deliver/etsi_ts/138200_138299/138211/18.06.00_60/ts_138211v180600p.pdf
+% Bảng 7.4.1.5.3-1.
+% 6 -> 8 Ports
+csiConfig.RowNumber = 6;           
+csiConfig.Density = {'one'};
+csiConfig.SubcarrierLocations = {[0 2 4 6]};
+csiConfig.SymbolLocations = {0};
+csiConfig.CSIRSPeriod = [4 0];
+csiConfig.NumRB = 273;
+csiConfig.RBOffset = 0;
 
-par.Us = Target_Num_Users; 
-par.B  = gNB_Params.NumAntennas;
-var.H  = All_UE_Feedback;  
+% CSI Report Config (Type II)
+subbandAmplitude = true;
+csiReport = nrCSIReportConfig;
+% Table 2 support 256QAM
+csiReport.CQITable = "table2"; 
+csiReport.CodebookType = "type2";
+csiReport.PanelDimensions = [1 4 1]; 
+csiReport.PMIFormatIndicator = "subband";
+csiReport.CQIFormatIndicator = "subband";
+csiReport.SubbandSize = 32;
+csiReport.SubbandAmplitude = subbandAmplitude;
+csiReport.NumberOfBeams = 2;
+csiReport.PhaseAlphabetSize = 4;
+csiReport.RIRestriction = [1 1 0 0]; 
 
-[Selected_UE_IDs, W_Total] = Block_SUS(par, var);
-
-if isempty(Selected_UE_IDs)
-    error('Block SUS không chọn được User nào. Thử tăng số lượng mẫu hoặc kiểm tra Epsilon trong hàm.');
-end
-
-fprintf('\n--- Bắt đầu tính toán Precoding (ZF) ---\n');
-
-W_Selected_List = [];
-UE_Layer_Map = []; 
-
-for i = 1:length(Selected_UE_IDs)
-    u_id = Selected_UE_IDs(i);
-    W_ue = All_UE_Feedback{u_id}; 
-    
-    W_Selected_List = [W_Selected_List, W_ue];
-    UE_Layer_Map = [UE_Layer_Map; u_id, nlayers_per_ue];
-end
-
-H_est_Total = W_Selected_List'; 
-
-W_ZF = pinv(H_est_Total); 
-
-Num_Streams_Total = size(W_ZF, 2);
-Scaling_Factor = 1 / sqrt(Num_Streams_Total); 
-W_Final = W_ZF .* Scaling_Factor;
-
-fprintf('Đã tạo ma trận Precoding kích thước: %d x %d\n', size(W_Final));
-
-fprintf('\n--- Bắt đầu phát dữ liệu (Tx) ---\n');
-
+% -----------------------------------------------------------------
+% Carrier Configuration
+% -----------------------------------------------------------------
 carrier = nrCarrierConfig;
-carrier.SubcarrierSpacing = 15;
-carrier.NSizeGrid = 52; 
+carrier.SubcarrierSpacing = 15; 
+carrier.NSizeGrid = 273;
 
-txGrid = nrResourceGrid(carrier, gNB_Params.NumAntennas);
+% -----------------------------------------------------------------
+% UE1 Configuration
+% -----------------------------------------------------------------
+pdsch = customPDSCHConfig(); 
+pdsch = pdsch.setMCS(MSCReport); % 16QAM
 
-Tx_Log = struct('UE_ID', [], 'Bits', [], 'PDSCH_Cfg', []);
+pdsch.NumLayers = nLayers;
+pdsch.PRBSet = 0:272; 
+pdsch.DMRS.DMRSConfigurationType = 1;
+pdsch.DMRS.DMRSAdditionalPosition = 1;
+pdsch.DMRS.DMRSPortSet = [0, 1]; 
 
-current_stream_idx = 1;
+[~, pdschInfo] = nrPDSCHIndices(carrier, pdsch);
+NREPerPRB = pdschInfo.NREPerPRB;
 
-for i = 1:length(Selected_UE_IDs)
-    u_id = Selected_UE_IDs(i);
-    if exist('UE_Layer_Map', 'var')
-        num_layers = UE_Layer_Map(i, 2);
-    else
-        num_layers = nlayers_per_ue;
-    end
-    
-    range_idx = current_stream_idx : (current_stream_idx + num_layers - 1);
-    W_For_This_UE = W_Final(:, range_idx); 
-    
-    pdsch_current = pdsch_cfg;
-    pdsch_current.RNTI = u_id; 
-    pdsch_current.NumLayers = num_layers;
-    
-    [pdschInd, indinfo] = nrPDSCHIndices(carrier, pdsch_current);
-    TBS = 5000; 
-    inputBits = randi([0 1], TBS, 1);
-    
-    [antsym, antind] = PDSCHToolbox(pdsch_current, carrier, inputBits, W_For_This_UE);
-    
-    txGrid(antind) = txGrid(antind) + antsym;
-    
-    Tx_Log(i).UE_ID = u_id;
-    Tx_Log(i).Bits = inputBits;
-    Tx_Log(i).PDSCH_Cfg = pdsch_current;
-    
-    current_stream_idx = current_stream_idx + num_layers;
-    
-    fprintf('   + UE %d: Đã map vào Grid (Dùng cột Precoding %d-%d)\n', u_id, range_idx(1), range_idx(end));
+% Get the optimize input length for transmit
+TBS = nrTBS(pdsch.Modulation, pdsch.NumLayers, ...
+            length(pdsch.PRBSet), NREPerPRB, pdsch.TargetCodeRate);
+inputBits = randi([0 1], TBS, 1);
+
+% -----------------------------------------------------------------
+% UE2 Configuration
+% -----------------------------------------------------------------
+pdsch2 = pdsch; 
+pdsch2.DMRS.DMRSPortSet = [2, 3]; 
+
+[~, pdschInfo] = nrPDSCHIndices(carrier, pdsch2);
+NREPerPRB = pdschInfo.NREPerPRB;
+
+TBS = nrTBS(pdsch2.Modulation, pdsch2.NumLayers, ...
+            length(pdsch2.PRBSet), NREPerPRB, pdsch2.TargetCodeRate);
+inputBits2 = randi([0 1], TBS, 1);
+
+% -----------------------------------------------------------------
+% TX
+% -----------------------------------------------------------------
+
+% -----------------------------------------------------------------
+% PDSCH Modulation
+% -----------------------------------------------------------------
+[layerMappedSym, pdschInd] = PDSCHEncode(pdsch, carrier, inputBits);
+[layerMappedSym2, pdschInd2] = PDSCHEncode(pdsch2, carrier, inputBits2);
+
+
+% -----------------------------------------------------------------
+% Find the orthogonal PMI
+% -----------------------------------------------------------------
+[best_pair_info, worst_pair_info, ~, ~] = ...
+    prepareData(...
+        NumUEs, carrier, csiConfig, csiReport,...
+        THREAD_HOLD, nTxAnts, nRxAnts, sampleRate, nLayers...
+    );
+
+if comparisionCase == "Orthogonal"
+    current_info = best_pair_info;
+else
+    current_info = worst_pair_info;
 end
 
+% UE Precoding matrix after measurement CSI
+UE1_W = current_info.UE1.W;
+UE2_W = current_info.UE2.W;
+
+% The UE specific channel
+UE1_Channel = current_info.UE1.channel;
+UE2_Channel = current_info.UE2.channel;
+
+% -----------------------------------------------------------------
+% MMSE Equalization
+% -----------------------------------------------------------------
+H_composite = [UE1_W.'; UE2_W.'];
+
+numTx = size(UE1_W, 1);
+W_total_T = getMMSEPrecoder(H_composite, SNR_dB, numTx);
+
+% Extract W precoding from the Final W after MMSE
+nLayers1 = size(UE1_W, 2);
+W_transposed = W_total_T(1:nLayers1, :);      
+W2_transposed = W_total_T(nLayers1+1:end, :);  
+
+
+% -----------------------------------------------------------------
+% Precoding 
+% -----------------------------------------------------------------
+[antsym, antind] = nrPDSCHPrecode(carrier, layerMappedSym, pdschInd, W_transposed);
+[antsym2, antind2] = nrPDSCHPrecode(carrier, layerMappedSym2, pdschInd2, W2_transposed);
+
+% -----------------------------------------------------------------
+% DMRS
+% -----------------------------------------------------------------
+dmrsSym = nrPDSCHDMRS(carrier, pdsch);
+dmrsInd = nrPDSCHDMRSIndices(carrier, pdsch);
+[dmrsAntSym, dmrsAntInd] = nrPDSCHPrecode(carrier, dmrsSym, dmrsInd, W_transposed);
+
+dmrsSym2 = nrPDSCHDMRS(carrier, pdsch2);
+dmrsInd2 = nrPDSCHDMRSIndices(carrier, pdsch2);
+[dmrsAntSym2, dmrsAntInd2] = nrPDSCHPrecode(carrier, dmrsSym2, dmrsInd2, W2_transposed);
+
+% -----------------------------------------------------------------
+% Resource Mapping
+% -----------------------------------------------------------------
+numPorts = size(W_transposed, 2);
+
+txGrid = nrResourceGrid(carrier, numPorts); 
+
+txGrid(antind) = antsym;
+txGrid(dmrsAntInd) = dmrsAntSym;
+
+txGrid(antind2) = txGrid(antind2) + antsym2;
+txGrid(dmrsAntInd2) = txGrid(dmrsAntInd2) + dmrsAntSym2;
+
+% OFDM Modulation
 [txWaveform, waveformInfo] = nrOFDMModulate(carrier, txGrid);
 
-fprintf('\n--- Bắt đầu thu và giải mã (Rx) ---\n');
+% -----------------------------------------------------------------
+% Channel
+% -----------------------------------------------------------------
+% rxWaveformUE1 = channelPropagateAndSync( ...
+%         txWaveform, carrier, UE1_Channel, dmrsInd, dmrsSym, SNR_dB);
 
-SNR_dB = 40; 
+% rxWaveformUE2 = channelPropagateAndSync( ...
+%         txWaveform, carrier, UE2_Channel, dmrsInd2, dmrsSym2, SNR_dB);
 
-for i = 1:length(Selected_UE_IDs)
-    u_id = Selected_UE_IDs(i);
-    fprintf('UE %d đang giải mã... ', u_id);
-    
-    H_ue = All_UE_Feedback{u_id}'; 
-    
-    rxWave = txWaveform * H_ue.'; 
-    rxWave = awgn(rxWave, SNR_dB, 'measured');
-    
-    rxGrid = nrOFDMDemodulate(carrier, rxWave);
-    [K_rx, L_rx, R_rx] = size(rxGrid);
-    
-    H_eff_total = H_ue * W_Final; 
-    
-    if exist('UE_Layer_Map', 'var')
-        num_L = UE_Layer_Map(i, 2);
-        my_stream_start = sum(UE_Layer_Map(1:i-1, 2));
-    else
-        num_L = nlayers_per_ue;
-        my_stream_start = (i-1) * num_L;
+[rxWaveformUE1, ~] = channelFlatFading(txWaveform, SNR_dB, 4);
+[rxWaveformUE2, ~] = channelFlatFading(txWaveform, SNR_dB, 4);
+
+% -----------------------------------------------------------------
+% RX
+% -----------------------------------------------------------------
+% OFDM Demodulation
+rxGrid1 = nrOFDMDemodulate(carrier, rxWaveformUE1);
+rxGrid2 = nrOFDMDemodulate(carrier, rxWaveformUE2);
+
+% -----------------------------------------------------------------
+% Extract data for UE1
+% -----------------------------------------------------------------
+refDmrsSym1 = nrPDSCHDMRS(carrier, pdsch);
+refDmrsInd1 = nrPDSCHDMRSIndices(carrier, pdsch);
+
+% Estimate
+[Hest1, nVar1] = nrChannelEstimate(carrier, rxGrid1, refDmrsInd1, refDmrsSym1);
+
+% Extract data
+[pdschRx1, pdschHest1] = nrExtractResources(pdschInd, rxGrid1, Hest1);
+[eqSymbols1, csi1] = nrEqualizeMMSE(pdschRx1, pdschHest1, nVar1);
+
+TBS1 = length(inputBits);
+[rxBits1, ~] = PDSCHDecode(pdsch, carrier, eqSymbols1, TBS1, SNR_dB);
+
+% Compute BER
+numErrors1 = biterr(double(inputBits(:)), double(rxBits1(:)));
+BER1 = numErrors1 / TBS1;
+disp(['BER UE 1: ', num2str(BER1)]);
+
+% -----------------------------------------------------------------
+% Extract Data for UE2
+% -----------------------------------------------------------------
+
+% Extract DMRS
+refDmrsSym2 = nrPDSCHDMRS(carrier, pdsch2); 
+refDmrsInd2 = nrPDSCHDMRSIndices(carrier, pdsch2); 
+
+% Estimate
+[Hest2, nVar2] = nrChannelEstimate(carrier, rxGrid2, refDmrsInd2, refDmrsSym2);
+
+% Extract PDSCH Data
+[pdschRx2, pdschHest2] = nrExtractResources(pdschInd2, rxGrid2, Hest2); 
+[eqSymbols2, csi2] = nrEqualizeMMSE(pdschRx2, pdschHest2, nVar2);
+
+TBS2 = length(inputBits2);
+[rxBits2, ~] = PDSCHDecode(pdsch2, carrier, eqSymbols2, TBS2, SNR_dB);
+
+% Compute BER
+numErrors2 = biterr(double(inputBits2(:)), double(rxBits2(:)));
+BER2 = numErrors2 / TBS2;
+disp(['BER UE 2: ', num2str(BER2)]);
+
+
+% -----------------------------------------------------------------
+% HELPER FUNCTION
+% -----------------------------------------------------------------
+
+function [...
+    best_pair_info, worst_pair_info, all_candidates, info ] = ...
+prepareData(...
+        NumUEs, carrier, csiConfig, csiReport,...
+        THREAD_HOLD, nTxAnts, nRxAnts, sampleRate, nLayers...
+)
+
+    % Initial channel list
+    channelList = cell(1, NumUEs);
+
+    for ueIdx = 1:NumUEs
+        tdl = nrTDLChannel();
+        tdl.DelayProfile = 'TDL-A';       
+        tdl.DelaySpread = 300e-9;
+        tdl.MaximumDopplerShift = 0;      
+        tdl.SampleRate = sampleRate;
+        tdl.NumTransmitAntennas = nTxAnts; 
+        tdl.NumReceiveAntennas = nRxAnts;
+        tdl.Seed = ueIdx;
+        channelList{ueIdx} = tdl;
     end
-    my_range = (my_stream_start + 1) : (my_stream_start + num_L);
-    
-    H_eff_desired = H_eff_total(:, my_range);
-    
-    W_eq = pinv(H_eff_desired); 
-    
-    pdsch_rx = Tx_Log(i).PDSCH_Cfg;
-    
-    pdsch_temp = pdsch_rx;
-    pdsch_temp.NumLayers = 1; 
-    
-    [ind_1layer, ~] = nrPDSCHIndices(carrier, pdsch_temp);
-    
-    [sub_k, sub_l, ~] = ind2sub([carrier.NSizeGrid*12, carrier.SymbolsPerSlot, 1], double(ind_1layer));
-    
-    num_REs = length(ind_1layer);
-    rx_raw = zeros(num_REs, R_rx);
-    
-    for r = 1:R_rx
-        try
-            idx_r = sub2ind([K_rx, L_rx], sub_k, sub_l);
-            rx_raw(:, r) = rxGrid(idx_r + (r-1)*K_rx*L_rx);
-        catch
-            error('Lỗi kích thước Grid. Kiểm tra lại cấu hình Carrier ở Tx và Rx.');
-        end
+
+    % Initial W
+    all_W = cell(1, NumUEs);
+
+    % Codebook Config - The same for all UE
+    cfg = struct();
+    cfg.CodebookConfig.N1 = csiReport.PanelDimensions(2); 
+    cfg.CodebookConfig.N2 = csiReport.PanelDimensions(3);
+    cfg.CodebookConfig.O1 = 4;
+    cfg.CodebookConfig.O2 = 1;
+    cfg.CodebookConfig.NumberOfBeams = csiReport.PanelDimensions(1) * csiReport.NumberOfBeams;      
+    cfg.CodebookConfig.PhaseAlphabetSize = csiReport.PhaseAlphabetSize; 
+    cfg.CodebookConfig.SubbandAmplitude = csiReport.SubbandAmplitude;
+    cfg.CodebookConfig.numLayers = nLayers;          
+
+    % Starting calculate the csi
+    for ueIdx = 1:NumUEs
+        currentChannel = channelList{ueIdx};
+        
+        [i1, i2] = csiRsMesurements(carrier, currentChannel, csiConfig, csiReport, nLayers);
+        
+        W = generateTypeIIPrecoder(cfg, i1, i2, true);
+        
+        all_W{ueIdx} = W;
     end
-    
-    eq_syms = rx_raw * W_eq.';
-    
-    rxLLR = nrLayerDemap(eq_syms); 
-    rxLLR = rxLLR{1}; 
-    
-    scaling_factor = mean(vecnorm(W_eq').^2); 
-    noiseVar = 10^(-SNR_dB/10) * scaling_factor;
-    
-    rxLLR = nrSymbolDemodulate(rxLLR, pdsch_rx.Modulation, noiseVar);
-    
-    if isempty(pdsch_rx.NID), nid = carrier.NCellID; else, nid = pdsch_rx.NID(1); end
-    c_seq = nrPDSCHPRBS(nid, pdsch_rx.RNTI, 0, length(rxLLR));
-    rxLLR = rxLLR .* (1 - 2*double(c_seq));
-    
-    TBS = length(Tx_Log(i).Bits);
-    rate_recovered = nrRateRecoverLDPC(rxLLR, TBS, pdsch_rx.TargetCodeRate, 0, pdsch_rx.Modulation, num_L);
-    
-    [decBits, blkErr] = nrLDPCDecode(rate_recovered, baseGraphSelection(zeros(TBS+24,1), pdsch_rx.TargetCodeRate), 25);
-    [rxBits, err] = nrCRCDecode(nrCodeBlockDesegmentLDPC(decBits, baseGraphSelection(zeros(TBS+24,1), pdsch_rx.TargetCodeRate), TBS+24), '24A');
-    
-    numErr = biterr(double(Tx_Log(i).Bits), double(rxBits));
-    if numErr == 0
-        fprintf('PASS (Clean!)\n');
-    else
-        fprintf('FAIL (Errors: %d / %d)\n', numErr, TBS);
-        fprintf('   -> Debug: Kích thước LLR: %d. NoiseVar: %.4f\n', length(rxLLR), noiseVar);
-    end
-end
 
-function [antsym, antind] = PDSCHToolbox(pdschConfig, carrier, inputBits, W)
-    setupPath();   
+    % Perform UE pairing.
+    [best_pair_info, worst_pair_info, all_candidates, info] = ...
+        findBestUEPair(all_W, channelList, THREAD_HOLD);
 
-    nlayers = pdschConfig.NumLayers;
-
-    [pdschInd, indinfo] = nrPDSCHIndices(carrier, pdschConfig);
-    G = indinfo.G;  
-
-    crcEncoded = nrCRCEncode(inputBits,'24A');
-    bgn = baseGraphSelection(crcEncoded, pdschConfig.TargetCodeRate);
-    cbs = nrCodeBlockSegmentLDPC(crcEncoded, bgn);
-    codedcbs = nrLDPCEncode(cbs, bgn);
-
-    rv = 0;
-    ratematched = nrRateMatchLDPC(codedcbs, G, rv, pdschConfig.Modulation, nlayers);
-
-    if isempty(pdschConfig.NID)
-        nid = carrier.NCellID;
-    else
-        nid = pdschConfig.NID(1);
-    end
-    rnti = pdschConfig.RNTI;
-
-    c = nrPDSCHPRBS(nid, rnti, 0, length(ratematched));
-    scrambled = mod(ratematched + c, 2);
-
-    modulated = nrSymbolModulate(scrambled, pdschConfig.Modulation);
-
-    layerMappedSym = nrLayerMap(modulated, nlayers);
-    fprintf('Layer Mapping ::::: %d x %d \n\n', size(layerMappedSym));
-
-    W_transposed = W.';
-
-    [antsym, antind] = nrPDSCHPrecode(carrier, layerMappedSym, pdschInd, W_transposed);
+    disp(['Best UE pair correlation:::: ', num2str(info.best_Cmn)]);
+    disp(['Worst UE pair correlation:::: ', num2str(info.worst_Cmn)]);
 end
