@@ -11,16 +11,13 @@ nRxAnts = 4;
 sampleRate = 61440000;  
 SNR_dB = 20;
 
-% -----------------------------------------------------------------
-% Channel Configuration
-% -----------------------------------------------------------------
-channel = nrTDLChannel();
-channel.DelayProfile = 'TDL-C';       
-channel.DelaySpread = 300e-9;
-channel.MaximumDopplerShift = 5;      
-channel.SampleRate = sampleRate;
-channel.NumTransmitAntennas = nTxAnts; 
-channel.NumReceiveAntennas = nRxAnts;
+
+% Channel for test
+% Rayleigh || AWGN || Ideal || CDL
+% With Ideal channel, we can't choose the PMI orthogonal 
+% Because of all channel use the same PMI
+channelType = "Ideal";
+channel = getChannel(channelType, SNR_dB, nRxAnts, 1, [4 1 2 1 1]); 
 
 % -----------------------------------------------------------------
 % Carrier Configuration
@@ -48,7 +45,7 @@ csiConfig.NumRB = 273;
 csiConfig.RBOffset = 0;
 
 % -----------------------------------------------------------------
-% CSI Report Configuration
+% CSI Report Configuration Type II
 % -----------------------------------------------------------------
 subbandAmplitude = true;
 csiReport = nrCSIReportConfig;
@@ -62,8 +59,6 @@ csiReport.SubbandAmplitude = subbandAmplitude;
 csiReport.NumberOfBeams = 2;
 csiReport.PhaseAlphabetSize = 4;
 csiReport.RIRestriction = [1 1 0 0]; 
-
-[i1, i2] = csiRsMesurements(carrier, channel, csiConfig, csiReport, nlayers, "PropagateAndSync");
 
 % -----------------------------------------------------------------
 % Codebook Configuration
@@ -83,21 +78,32 @@ cfg.numLayers = nlayers;
 % -----------------------------------------------------------------
 pdsch = customPDSCHConfig(); 
 
-% Table 5.1.3.1-2: MCS index table 2 for PDSCH - 138 214
-% https://www.etsi.org/deliver/etsi_ts/138200_138299/138214/18.06.00_60/ts_138214v180600p.pdf
-pdsch = pdsch.setMCS(6); 
-
 pdsch.CodebookConfig = cfg;
-pdsch.Indices.i1 = i1;
-pdsch.Indices.i2 = i2;
 pdsch.DMRS.DMRSConfigurationType = 1;
 pdsch.DMRS.DMRSAdditionalPosition = 1;
 pdsch.NumLayers = nlayers;
 % 273 PRB
 pdsch.PRBSet = 0:272;
 
+% -----------------------------------------------------------------
+% Mesurements
+% -----------------------------------------------------------------
+[MCS, PMI] = csiRsMesurements(carrier, channel, csiConfig, csiReport, pdsch, nlayers);
+
+pdsch.Indices.i1 = PMI.i1;
+pdsch.Indices.i2 = PMI.i2;
+
+% Table 5.1.3.1-2: MCS index table 2 for PDSCH - 138 214
+% https://www.etsi.org/deliver/etsi_ts/138200_138299/138214/18.06.00_60/ts_138214v180600p.pdf
+pdsch = pdsch.setMCS(MCS); 
+
+% -----------------------------------------------------------------
+% Generate Bits
+% -----------------------------------------------------------------
 [~, pdschInfo] = nrPDSCHIndices(carrier, pdsch);
 NREPerPRB = pdschInfo.NREPerPRB;
+
+disp(pdsch.Modulation);
 
 TBS = nrTBS(pdsch.Modulation, pdsch.NumLayers, ...
             length(pdsch.PRBSet), NREPerPRB, pdsch.TargetCodeRate);
@@ -122,9 +128,7 @@ txGrid(dmrsAntInd) = dmrsAntSym;
 % -----------------------------------------------------------------
 % Channel
 % -----------------------------------------------------------------
-rxWaveform = channelPropagateAndSync( ...
-        txWaveform, carrier, channel, dmrsInd, dmrsSym, SNR_dB);
-
+rxWaveform = channel(txWaveform);
 
 % -----------------------------------------------------------------
 % RX and Calculate BER
@@ -142,3 +146,40 @@ numErrors = biterr(double(inputBits(:)), double(rxBits(:)));
 BER = numErrors / TBS;
 
 disp(BER);
+
+
+% -----------------------------------------------------------------
+% This function use to get the channel for TEST
+% It return:
+%   - channel: AWGN | Rayleigh | Ideal channel.
+% -----------------------------------------------------------------
+function channel = getChannel(channelType, SNR_dB, nRxAnts, ueIdx, cdlChannelAntenna) 
+    switch channelType
+        case 'AWGN'
+            channel = AWGNChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
+            
+        case 'Rayleigh'
+            channel = RayleighChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
+            
+        case 'Ideal'
+            channel = IdealChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
+
+        case 'CDL'
+            cdlChannel = nrCDLChannel;
+            cdlChannel.DelayProfile = 'CDL-C';
+            % Format [M, N, P, Mg, Ng] 
+            %   M: The number of antenna in the vertical = N1
+            %   N: The number of antenna in the horizontal = N2
+            %   P: Polarization
+            %   Mg: The number of panel row
+            %   Ng: The number of panel column
+            cdlChannel.TransmitAntennaArray.Size = cdlChannelAntenna;
+            cdlChannel.ReceiveAntennaArray.Size = [2, 1, 2, 1, 1];   
+            cdlChannel.Seed = ueIdx; 
+
+            channel = cdlChannel;
+            
+        otherwise
+            error('Invalid Type "%s"', channelType);
+    end
+end

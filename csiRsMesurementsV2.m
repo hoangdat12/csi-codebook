@@ -1,4 +1,4 @@
-function [MCS, PMI] = csiRsMesurements(carrier, channel, csiConfig, csiReport, pdsch, nLayers, channelType)
+function [MCS, PMI] = csiRsMesurementsV2(carrier, channel, csiConfig, csiReport, pdsch, nLayers, channelType)
     if nargin < 7
         channelType = "FlatFading";
     end        
@@ -69,11 +69,9 @@ end
 function [i11, i12, i13, i14, i21, i22] = ...
     extractPMISet(PMISet, nLayers, numBeams, subbandAmplitude)
 
-    % Extract i1
+    % Extract i1 (Wideband - Giữ nguyên vì nó giống nhau cho mọi subband)
     % i1 = [q1 q2 i12 i131 i141 i132 i142 ...]
     % i1 - 1 based index 
-    % i22 - 1 based index
-    % i21 - 0 based index
     i1 = PMISet.i1;
 
     % Convert to 0-based index
@@ -96,17 +94,33 @@ function [i11, i12, i13, i14, i21, i22] = ...
     i13 = i13 - 1;
     i14 = i14' - 1;
 
-    % Get the first subband 
-    i2_sb1 = PMISet.i2(:,:,1);
-
-    % Extract and convert to 0-based index
+    % --- PHẦN SỬA ĐỔI: LẤY TOÀN BỘ SUBBAND ---
+    
+    % i2 có kích thước: [Dim1, Dim2, NumSubbands]
+    % Ta cần xử lý toàn bộ matrix 3D thay vì chỉ lấy (:,:,1)
+    
     if subbandAmplitude
-        i21 = i2_sb1(:,1:2:end)';
-        i22 = i2_sb1(:,2:2:end)' - 1;
+        % Lấy các cột lẻ (1, 3, 5...) cho tất cả subband
+        raw_i21 = PMISet.i2(:, 1:2:end, :);
+        
+        % Lấy các cột chẵn (2, 4, 6...) cho tất cả subband
+        raw_i22 = PMISet.i2(:, 2:2:end, :);
+        
+        % Dùng permute để "Transpose" từng trang (Subband)
+        % Chuyển từ [Hàng, Cột, Subband] -> [Cột, Hàng, Subband]
+        i21 = permute(raw_i21, [2, 1, 3]);
+        
+        % Chuyển đổi và trừ 1 để về 0-based index
+        i22 = permute(raw_i22, [2, 1, 3]) - 1;
+        
     else
-        i21 = i2_sb1';
+        % Trường hợp không có Amplitude riêng cho subband
+        i21 = permute(PMISet.i2, [2, 1, 3]);
         i22 = [];
     end
+    
+    % Kết quả i21 và i22 bây giờ sẽ là ma trận 3 chiều:
+    % [NumLayers, NumParams, NumSubbands]
 end
 
 function mcsIndex = mapCQItoMCS(cqiParams)
