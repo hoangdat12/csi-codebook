@@ -40,12 +40,13 @@ function [BER, UEInfor] = suMimo(carrier, basePDSCHConfig, UEInfor, SNR_dB, isLo
         oldMCS = UEInfor.MCS;
 
         newMCS = max(0, oldMCS - 5);
-        UEInfor.MCS = newMCS;
         
-        pdsch = pdsch.setMCS(newMCS);
+        pdsch = linkAdaption(pdsch, newMCS, SNR_dB);
+        UEInfor.MCS = pdsch.MCSIndex;
     else
-        pdsch = pdsch.setMCS(UEInfor.MCS);
+        pdsch = linkAdaption(pdsch, UEInfor.MCS, SNR_dB);
     end
+
     % -----------------------------------------------------------------
     % PDSCH Modulation
     % -----------------------------------------------------------------
@@ -70,25 +71,11 @@ function [BER, UEInfor] = suMimo(carrier, basePDSCHConfig, UEInfor, SNR_dB, isLo
     channel = UEInfor.channel;
     rxWaveform = channel(txWaveform);
 
-
     % -----------------------------------------------------------------
     % RX and Calculate BER
     % -----------------------------------------------------------------
-    rxGrid = nrOFDMDemodulate(carrier, rxWaveform);
+    rxBits = rxPDSCHDecode(carrier, pdsch, rxWaveform, txWaveform, TBS);
 
-    refDmrsSym = nrPDSCHDMRS(carrier, pdsch);
-    
-    refDmrsInd = nrPDSCHDMRSIndices(carrier, pdsch);
-
-    [Hest, nVar] = nrChannelEstimate(carrier, rxGrid, refDmrsInd, refDmrsSym);
-
-    [pdschRx, pdschHest] = nrExtractResources(pdschInd, rxGrid, Hest);
-
-    eqSymbols = nrEqualizeMMSE(pdschRx, pdschHest, nVar);
-
-    TBS = length(inputBits);
-    rxBits = PDSCHDecode(pdsch, carrier, eqSymbols, TBS, SNR_dB);
-    numErrors = biterr(double(inputBits(:)), double(rxBits(:)));
-    
+    numErrors = biterr(double(inputBits), double(rxBits));
     BER = numErrors / TBS;
 end

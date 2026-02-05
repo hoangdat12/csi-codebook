@@ -11,6 +11,12 @@ nRxAnts = 4;
 sampleRate = 61440000;  
 SNR_dB = 20;
 
+% Channel for test
+% Rayleigh || AWGN || Ideal || CDL
+% With Ideal channel, we can't choose the PMI orthogonal 
+% Because of all channel use the same PMI
+channelType = "CDL";
+channel = getChannel(channelType, SNR_dB, nRxAnts, 1, [4 1 2 1 1]); 
 
 if nTxAnts == 8
     rowNumber = 6;
@@ -28,14 +34,6 @@ else
     cdlChannelAntenna = [4 4 2 1 1];
     csiReportSymbolLocations = {[2 3]};
 end
-
-
-% Channel for test
-% Rayleigh || AWGN || Ideal || CDL
-% With Ideal channel, we can't choose the PMI orthogonal 
-% Because of all channel use the same PMI
-channelType = "CDL";
-channel = getChannel(channelType, SNR_dB, nRxAnts, 1, [4 1 2 1 1]); 
 
 % -----------------------------------------------------------------
 % Carrier Configuration
@@ -132,28 +130,7 @@ W_transposed = W_subband.';
 
 % Table 5.1.3.1-2: MCS index table 2 for PDSCH - 138 214
 % https://www.etsi.org/deliver/etsi_ts/138200_138299/138214/18.06.00_60/ts_138214v180600p.pdf
-current_MCS = MCS;
-
-while current_MCS >= 0
-    pdsch = pdsch.setMCS(current_MCS);
-    
-    switch pdsch.Modulation
-        case 'QPSK'
-            expected_SNR = 10;   
-        case '16QAM'
-            expected_SNR = 20;  
-        case '64QAM'
-            expected_SNR = 30;  
-        case '256QAM'
-            expected_SNR = 40; 
-    end
-    
-    if expected_SNR <= SNR_dB
-        break;
-    else
-        current_MCS = current_MCS - 1;
-    end
-end
+pdsch = linkAdaption(pdsch, MCS, SNR_dB);
 
 % -----------------------------------------------------------------
 % Generate Bits
@@ -216,68 +193,12 @@ rxWaveform = channel(txWaveform);
 % -----------------------------------------------------------------
 % RX and Calculate BER
 % -----------------------------------------------------------------
-refGrid = nrResourceGrid(carrier, pdsch.NumLayers);
-refGrid(dmrsInd) = dmrsSym;
-refWaveform = nrOFDMModulate(carrier, refGrid); 
+rxBits = rxPDSCHDecode(carrier, pdsch, rxWaveform, txWaveform, TBS);
 
-% Ước lượng độ trễ
-offset = nrTimingEstimate(carrier, rxWaveform, refGrid);
-
-% Cắt tín hiệu đúng vị trí (để loại bỏ trễ kênh)
-rxWaveformSync = rxWaveform(1+offset:end, :);
-
-samplesNeeded = length(txWaveform); 
-
-% Nếu ngắn hơn, hãy chèn thêm số 0 vào đuôi
-if size(rxWaveformSync, 1) < samplesNeeded
-    padding = samplesNeeded - size(rxWaveformSync, 1);
-    rxWaveformSync = [rxWaveformSync; zeros(padding, size(rxWaveformSync, 2))];
-end
-
-% -----------------------------------------------------------------
-% 2. GIẢI ĐIỀU CHẾ & ƯỚC LƯỢNG KÊNH
-% -----------------------------------------------------------------
-rxGrid = nrOFDMDemodulate(carrier, rxWaveformSync);
-rxGrid = rxGrid(1:carrier.NSizeGrid*12, 1:carrier.SymbolsPerSlot, :);
-
-[Hest, nVar] = nrChannelEstimate(carrier, rxGrid, dmrsInd, dmrsSym, ...
-    'CDMLengths', pdsch.DMRS.CDMLengths, ... 
-    'AveragingWindow', [1 1]);
-
-[pdschRx, pdschHest] = nrExtractResources(pdschInd, rxGrid, Hest);
-[eqSymbols, csi] = nrEqualizeMMSE(pdschRx, pdschHest, nVar);
-
-% TBS = length(inputBits);
-% [rxBits, hasError] = PDSCHDecode(pdsch, carrier, eqSymbols, TBS, SNR_dB);
-% numErrors = biterr(double(inputBits(:)), double(rxBits(:)));
-% BER = numErrors / TBS;
-
-% disp(BER);
-
-
-% B1: Soft Demodulation (Ra LLRs)
-[dlschLLRs, rxSym] = nrPDSCHDecode(carrier, pdsch, eqSymbols, nVar);
-
-% B2: Khởi tạo và Cấu hình Đối tượng giải mã (System Object)
-decDL = nrDLSCHDecoder; % Tạo đối tượng
-decDL.TransportBlockLength = TBS; % Gán độ dài khối (Bắt buộc)
-decDL.TargetCodeRate = pdsch.TargetCodeRate;
-decDL.LDPCDecodingAlgorithm = 'Normalized min-sum';
-decDL.MaximumLDPCIterationCount = 6;
-
-% B3: Thực hiện giải mã
-% Cú pháp: [bits, err] = decDL(inputLLRs, Modulation, NumLayers, RedundancyVersion)
-rv = 0; % Redundancy Version (0 cho lần truyền đầu tiên)
-modStr = char(pdsch.Modulation); % Chuyển về dạng text cho chắc ăn
-
-[rxBits, blkErr] = decDL(dlschLLRs, modStr, pdsch.NumLayers, rv);
-
-% B4: Tính BER
 numErrors = biterr(double(inputBits), double(rxBits));
 BER = numErrors / TBS;
 
-fprintf('SNR: %d dB | Modulation: %s | BER: %.5f | Block Error: %d\n', ...
-    SNR_dB, modStr, BER, blkErr);
+fprintf('SNR: %d dB | BER: %.5f. \n', SNR_dB, BER);
 
 % -----------------------------------------------------------------
 % This function use to get the channel for TEST

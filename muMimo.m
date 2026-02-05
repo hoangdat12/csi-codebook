@@ -27,9 +27,9 @@ function [BER1, BER2] = muMimo(...
     [~, pdschInfo] = nrPDSCHIndices(carrier, pdsch2);
     NREPerPRB = pdschInfo.NREPerPRB;
 
-    TBS = nrTBS(pdsch2.Modulation, pdsch2.NumLayers, ...
+    TBS2 = nrTBS(pdsch2.Modulation, pdsch2.NumLayers, ...
                 length(pdsch2.PRBSet), NREPerPRB, pdsch2.TargetCodeRate);
-    inputBits2 = randi([0 1], TBS, 1);
+    inputBits2 = randi([0 1], TBS2, 1);
 
     % -----------------------------------------------------------------
     % TX
@@ -43,8 +43,8 @@ function [BER1, BER2] = muMimo(...
     % The value based on the Table 5.1.3.1 - 138 214
     % 11 -> 64QAM & 466/1024 Target code Rate
     % 6 -> 16QAM & 434/1024 Target code Rate
-    pdsch = pdsch.setMCS(UE1Infor.MCS);
-    pdsch2 = pdsch2.setMCS(UE2Infor.MCS);
+    pdsch = linkAdaption(pdsch, UE1Infor.MCS, SNR_dB);
+    pdsch2 = linkAdaption(pdsch2, UE2Infor.MCS, SNR_dB);
 
     % The UE specific channel
     UE1_Channel = UE1Infor.channel;
@@ -108,14 +108,23 @@ function [BER1, BER2] = muMimo(...
     % -----------------------------------------------------------------
     % Channel
     % -----------------------------------------------------------------
-    % rxWaveformUE1 = channelPropagateAndSync( ...
-    %         txWaveform, carrier, UE1_Channel, dmrsInd, dmrsSym, SNR_dB);
-
-    % rxWaveformUE2 = channelPropagateAndSync( ...
-    %         txWaveform, carrier, UE2_Channel, dmrsInd2, dmrsSym2, SNR_dB);
-
     rxWaveformUE1 = UE1_Channel(txWaveform);
     rxWaveformUE2 = UE2_Channel(txWaveform);
+
+    % % --- Add AWGN (Thermal Noise) ---
+    % SNR_linear = 10^(SNR_dB/10);
+
+    % % UE 1: Calculate signal power and add noise
+    % sigPower1 = mean(abs(rxWaveformUE1).^2, 'all');
+    % noisePower1 = sigPower1 / SNR_linear;
+    % noise1 = sqrt(noisePower1/2) * (randn(size(rxWaveformUE1)) + 1j*randn(size(rxWaveformUE1)));
+    % rxWaveformUE1 = rxWaveformUE1 + noise1;
+
+    % % UE 2: Calculate signal power and add noise
+    % sigPower2 = mean(abs(rxWaveformUE2).^2, 'all');
+    % noisePower2 = sigPower2 / SNR_linear;
+    % noise2 = sqrt(noisePower2/2) * (randn(size(rxWaveformUE2)) + 1j*randn(size(rxWaveformUE2)));
+    % rxWaveformUE2 = rxWaveformUE2 + noise2;
 
     % -----------------------------------------------------------------
     % RX
@@ -125,47 +134,16 @@ function [BER1, BER2] = muMimo(...
     % Extract data for UE1
     % -----------------------------------------------------------------
     % OFDM Demodulation
-    rxGrid1 = nrOFDMDemodulate(carrier, rxWaveformUE1);
+    rxBits = rxPDSCHDecode(carrier, pdsch, rxWaveformUE1, txWaveform, TBS);
 
-    refDmrsSym1 = nrPDSCHDMRS(carrier, pdsch);
-    refDmrsInd1 = nrPDSCHDMRSIndices(carrier, pdsch);
-
-    % Estimate
-    [Hest1, nVar1] = nrChannelEstimate(carrier, rxGrid1, refDmrsInd1, refDmrsSym1);
-
-    % Extract data
-    [pdschRx1, pdschHest1] = nrExtractResources(pdschInd, rxGrid1, Hest1);
-    eqSymbols1 = nrEqualizeMMSE(pdschRx1, pdschHest1, nVar1);
-
-    TBS1 = length(inputBits);
-    [rxBits1, ~] = PDSCHDecode(pdsch, carrier, eqSymbols1, TBS1, SNR_dB);
-
-    % Compute BER
-    numErrors1 = biterr(double(inputBits(:)), double(rxBits1(:)));
-    BER1 = numErrors1 / TBS1;
+    numErrors = biterr(double(inputBits), double(rxBits));
+    BER1 = numErrors / TBS;
 
     % -----------------------------------------------------------------
     % Extract Data for UE2
     % -----------------------------------------------------------------
+    rxBits2 = rxPDSCHDecode(carrier, pdsch2, rxWaveformUE2, txWaveform, TBS2);
 
-    % OFDM Demodulation
-    rxGrid2 = nrOFDMDemodulate(carrier, rxWaveformUE2);
-
-    % Extract DMRS
-    refDmrsSym2 = nrPDSCHDMRS(carrier, pdsch2); 
-    refDmrsInd2 = nrPDSCHDMRSIndices(carrier, pdsch2); 
-
-    % Estimate
-    [Hest2, nVar2] = nrChannelEstimate(carrier, rxGrid2, refDmrsInd2, refDmrsSym2);
-
-    % Extract PDSCH Data
-    [pdschRx2, pdschHest2] = nrExtractResources(pdschInd2, rxGrid2, Hest2); 
-    eqSymbols2 = nrEqualizeMMSE(pdschRx2, pdschHest2, nVar2);
-
-    TBS2 = length(inputBits2);
-    [rxBits2, ~] = PDSCHDecode(pdsch2, carrier, eqSymbols2, TBS2, SNR_dB);
-
-    % Compute BER
-    numErrors2 = biterr(double(inputBits2(:)), double(rxBits2(:)));
-    BER2 = numErrors2 / TBS2;
+    numErrors2 = biterr(double(inputBits2), double(rxBits2));
+    BER2 = numErrors2 / TBS;
 end
