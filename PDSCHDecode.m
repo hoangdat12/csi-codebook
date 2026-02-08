@@ -52,7 +52,9 @@ function [out, hasError] = PDSCHDecode(pdsch, carrier, eqSymbols, TBS, SNR_dB)
 
     % LDPC Decoding (Max 25 iterations)
     MAX_ITER = 25;
-    [decBits, ~] = nrLDPCDecode(raterecovered, bgn_rx, MAX_ITER);
+    [decBits, ~] = nrLDPCDecode(raterecovered, bgn_rx, MAX_ITER, ...
+                        'Algorithm', 'Normalized min-sum', ...
+                        'ScalingFactor', 0.75);
 
     % Code Block Desegmentation
     [rxPart, ~] = nrCodeBlockDesegmentLDPC(decBits, bgn_rx, TBS + 24);

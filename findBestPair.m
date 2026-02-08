@@ -31,11 +31,11 @@ end
 
 
 % Channel for test
-% Rayleigh || AWGN || Ideal || CDL
+% Rayleigh || AWGN || Ideal || TDL
 % With Ideal channel, we can't choose the PMI orthogonal 
 % Because of all channel use the same PMI
-channelType = "CDL";
-channel = getChannel(channelType, SNR_dB, nRxAnts, 1, [4 1 2 1 1]); 
+channelType = "TDL";
+channel = getChannel(channelType, SNR_dB, nRxAnts, 1, sampleRate); 
 
 % -----------------------------------------------------------------
 % Carrier Configuration
@@ -108,7 +108,7 @@ numUes = 10;
 [all_W, channelList, MCS_List] = ...
     prepareData(...
         numUes, carrier, csiConfig, csiReport, pdsch, nTxAnts,...
-        nRxAnts, SNR_dB, channelType, cdlChannelAntenna, nlayers ...
+        nRxAnts, SNR_dB, channelType, nlayers ...
     );
 
 % -----------------------------------------------------------------
@@ -120,8 +120,6 @@ correlationMatrix = zeros(numUes, numUes);
 
 % Số lượng subband (lấy từ dữ liệu của UE 1)
 numSubbands = size(all_W{1}, 3); 
-
-fprintf('Dang tinh toan ma tran tuong quan cho %d UEs...\n', numUes);
 
 minRho = 100;           
 bestPairIndices = [0 0]; 
@@ -160,7 +158,7 @@ function [...
     all_W, channelList, MCS_List] = ...
 prepareData(...
         NumUEs, carrier, csiConfig, csiReport, pdsch, nTxAnts,...
-        nRxAnts, SNR_dB, channelType, cdlChannelAntenna, nlayers...
+        nRxAnts, SNR_dB, channelType, nlayers...
 )
 
     % Initial channel list
@@ -172,7 +170,7 @@ prepareData(...
 
     % Starting calculate the csi
     for ueIdx = 1:NumUEs
-        channel = getChannel(channelType, SNR_dB, nRxAnts, ueIdx, cdlChannelAntenna); 
+        channel = getChannel(channelType, SNR_dB, nRxAnts, ueIdx, sampleRate); 
 
         channelList{ueIdx} = channel;
         
@@ -203,42 +201,6 @@ prepareData(...
         MCS_List{ueIdx} = MCS;
         
         all_W{ueIdx} = all_W_Ue;
-    end
-end
-
-% -----------------------------------------------------------------
-% This function use to get the channel for TEST
-% It return:
-%   - channel: AWGN | Rayleigh | Ideal channel.
-% -----------------------------------------------------------------
-function channel = getChannel(channelType, SNR_dB, nRxAnts, ueIdx, cdlChannelAntenna) 
-    switch channelType
-        case 'AWGN'
-            channel = AWGNChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
-            
-        case 'Rayleigh'
-            channel = RayleighChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
-            
-        case 'Ideal'
-            channel = IdealChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
-
-        case 'CDL'
-            cdlChannel = nrCDLChannel;
-            cdlChannel.DelayProfile = 'CDL-C';
-            % Format [M, N, P, Mg, Ng] 
-            %   M: The number of antenna in the vertical = N1
-            %   N: The number of antenna in the horizontal = N2
-            %   P: Polarization
-            %   Mg: The number of panel row
-            %   Ng: The number of panel column
-            cdlChannel.TransmitAntennaArray.Size = cdlChannelAntenna;
-            cdlChannel.ReceiveAntennaArray.Size = [2, 1, 2, 1, 1];   
-            cdlChannel.Seed = ueIdx; 
-
-            channel = cdlChannel;
-            
-        otherwise
-            error('Invalid Type "%s"', channelType);
     end
 end
 

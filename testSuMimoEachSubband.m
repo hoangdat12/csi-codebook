@@ -12,26 +12,23 @@ sampleRate = 61440000;
 SNR_dB = 20;
 
 % Channel for test
-% Rayleigh || AWGN || Ideal || CDL
+% Rayleigh || AWGN || Ideal || TDL
 % With Ideal channel, we can't choose the PMI orthogonal 
 % Because of all channel use the same PMI
-channelType = "CDL";
-channel = getChannel(channelType, SNR_dB, nRxAnts, 1, [4 1 2 1 1]); 
+channelType = "TDL";
+channel = getChannel(channelType, SNR_dB, nRxAnts, 1, sampleRate); 
 
 if nTxAnts == 8
     rowNumber = 6;
     csiReportAntenna = [1 4 1];
-    cdlChannelAntenna = [4 1 2 1 1];
     csiReportSymbolLocations = {0};
 elseif nTxAnts == 16
     rowNumber = 11;
     csiReportAntenna = [1 4 2];
-    cdlChannelAntenna = [4 2 2 1 1];
     csiReportSymbolLocations = {0};
 else 
     rowNumber = 17;
     csiReportAntenna = [1 4 4];
-    cdlChannelAntenna = [4 4 2 1 1];
     csiReportSymbolLocations = {[2 3]};
 end
 
@@ -105,6 +102,24 @@ pdsch.PRBSet = 0:272;
 % Mesurements
 % -----------------------------------------------------------------
 [MCS, PMI] = csiRsMesurementsV2(carrier, channel, csiConfig, csiReport, pdsch, nlayers);
+
+for k = 1:length(PMI.i1)
+    val = PMI.i1{k};
+    val_str = mat2str(val); 
+    fprintf('i1%d :::::::::: %s\n', k, val_str);
+end
+
+% In phần i2 (có chia subband)
+for k = 1:length(PMI.i2)
+    data = PMI.i2{k};
+    num_subbands = size(data, 3);
+    
+    for sb = 1:num_subbands
+        val_sb = data(:,:,sb);
+        val_sb_str = mat2str(val_sb);
+        fprintf('i2%d - subband %d :::::::::: %s\n', k, sb, val_sb_str);
+    end
+end
 
 % 1. Xác định kích thước
 numSubbands = size(PMI.i2{1}, 3);
@@ -199,39 +214,3 @@ numErrors = biterr(double(inputBits), double(rxBits));
 BER = numErrors / TBS;
 
 fprintf('SNR: %d dB | BER: %.5f. \n', SNR_dB, BER);
-
-% -----------------------------------------------------------------
-% This function use to get the channel for TEST
-% It return:
-%   - channel: AWGN | Rayleigh | Ideal channel.
-% -----------------------------------------------------------------
-function channel = getChannel(channelType, SNR_dB, nRxAnts, ueIdx, cdlChannelAntenna) 
-    switch channelType
-        case 'AWGN'
-            channel = AWGNChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
-            
-        case 'Rayleigh'
-            channel = RayleighChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
-            
-        case 'Ideal'
-            channel = IdealChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
-
-        case 'CDL'
-            cdlChannel = nrCDLChannel;
-            cdlChannel.DelayProfile = 'CDL-C';
-            % Format [M, N, P, Mg, Ng] 
-            %   M: The number of antenna in the vertical = N1
-            %   N: The number of antenna in the horizontal = N2
-            %   P: Polarization
-            %   Mg: The number of panel row
-            %   Ng: The number of panel column
-            cdlChannel.TransmitAntennaArray.Size = cdlChannelAntenna;
-            cdlChannel.ReceiveAntennaArray.Size = [2, 1, 2, 1, 1];   
-            cdlChannel.Seed = ueIdx; 
-
-            channel = cdlChannel;
-            
-        otherwise
-            error('Invalid Type "%s"', channelType);
-    end
-end

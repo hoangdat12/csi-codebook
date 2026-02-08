@@ -13,11 +13,11 @@ SNR_dB = 20;
 
 
 % Channel for test
-% Rayleigh || AWGN || Ideal || CDL
+% Rayleigh || AWGN || Ideal || TDL
 % With Ideal channel, we can't choose the PMI orthogonal 
 % Because of all channel use the same PMI
-channelType = "Rayleigh";
-channel = getChannel(channelType, SNR_dB, nRxAnts, 1, [4 1 2 1 1], sampleRate); 
+channelType = "TDL";
+channel = getChannel(channelType, SNR_dB, nRxAnts, 1, sampleRate); 
 
 % -----------------------------------------------------------------
 % Carrier Configuration
@@ -137,83 +137,3 @@ numErrors = biterr(double(inputBits), double(rxBits));
 BER = numErrors / TBS;
 
 fprintf('SNR: %d dB | BER: %.5f. \n', SNR_dB, BER);
-
-% -----------------------------------------------------------------
-% This function use to get the channel for TEST
-% It return:
-%   - channel: AWGN | Rayleigh | Ideal channel.
-% -----------------------------------------------------------------
-function channel = getChannel(channelType, SNR_dB, nRxAnts, ueIdx, cdlChannelAntenna, sampleRate) 
-    switch channelType
-        case 'AWGN'
-            channel = AWGNChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
-            
-        case 'Rayleigh'
-            channel = RayleighChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
-            
-        case 'Ideal'
-            channel = IdealChannel('SNRdB', SNR_dB, 'NumRxAnts', nRxAnts);
-
-        case 'CDL'
-            % cdlChannel = nrCDLChannel;
-            % cdlChannel.DelayProfile = 'CDL-C';
-            % % Format [M, N, P, Mg, Ng] 
-            % %   M: The number of antenna in the vertical = N1
-            % %   N: The number of antenna in the horizontal = N2
-            % %   P: Polarization
-            % %   Mg: The number of panel row
-            % %   Ng: The number of panel column
-            % cdlChannel.TransmitAntennaArray.Size = cdlChannelAntenna;
-            % cdlChannel.ReceiveAntennaArray.Size = [2, 1, 2, 1, 1];   
-            % cdlChannel.Seed = ueIdx; 
-
-            % --- BƯỚC 1: Tạo kênh tham chiếu & ÁP DỤNG DELAY SPREAD NGAY TẠI ĐÂY ---
-            refChan = nrCDLChannel;
-            refChan.DelayProfile = 'CDL-C';
-            refChan.DelaySpread = 300e-9; % [Quan trọng] Co giãn thời gian trễ chuẩn ở đây
-            
-            % --- BƯỚC 2: Tính góc xoay ngẫu nhiên ---
-            rng(ueIdx); 
-            azimuthOffset = 360 * rand() - 180; 
-            
-            % --- BƯỚC 3: Tạo kênh Custom ---
-            channelObj = nrCDLChannel;
-            channelObj.DelayProfile = 'Custom'; 
-            
-            % Gán Delay và Gain (Lấy từ refChan đã được scale sẵn)
-            channelObj.PathDelays = refChan.PathDelays;       % Giá trị giây thực tế
-            channelObj.AveragePathGains = refChan.AveragePathGains;
-            
-            % Gán các góc chuẩn
-            channelObj.AnglesAoA = refChan.AnglesAoA;
-            channelObj.AnglesZoD = refChan.AnglesZoD;
-            channelObj.AnglesZoA = refChan.AnglesZoA;
-            
-            % Chỉ gán HasLOSCluster (CDL-C mặc định là false, nhưng cứ copy cho chắc)
-            channelObj.HasLOSCluster = refChan.HasLOSCluster;
-            
-            % [FIX] Không gán KFactorFirstCluster vì CDL-C là NLOS (HasLOSCluster=false)
-            
-            % --- BƯỚC 4: Xoay góc AoD ---
-            newAoD = refChan.AnglesAoD + azimuthOffset;
-            newAoD = mod(newAoD + 180, 360) - 180; % Wrap góc
-            channelObj.AnglesAoD = newAoD;
-
-            % --- BƯỚC 5: Cấu hình chung ---
-            % [FIX] Không set DelaySpread ở đây nữa (vì đã áp dụng ở bước 1 rồi)
-            
-            channelObj.CarrierFrequency = 3.5e9;
-            channelObj.MaximumDopplerShift = 5;
-            
-            channelObj.TransmitAntennaArray.Size = cdlChannelAntenna;
-            channelObj.ReceiveAntennaArray.Size = [2, 1, 2, 1, 1]; 
-            
-            channelObj.SampleRate = sampleRate;
-            channelObj.Seed = ueIdx;
-
-            channel = channelObj;
-            
-        otherwise
-            error('Invalid Type "%s"', channelType);
-    end
-end

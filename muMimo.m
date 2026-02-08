@@ -111,21 +111,6 @@ function [BER1, BER2] = muMimo(...
     rxWaveformUE1 = UE1_Channel(txWaveform);
     rxWaveformUE2 = UE2_Channel(txWaveform);
 
-    % % --- Add AWGN (Thermal Noise) ---
-    % SNR_linear = 10^(SNR_dB/10);
-
-    % % UE 1: Calculate signal power and add noise
-    % sigPower1 = mean(abs(rxWaveformUE1).^2, 'all');
-    % noisePower1 = sigPower1 / SNR_linear;
-    % noise1 = sqrt(noisePower1/2) * (randn(size(rxWaveformUE1)) + 1j*randn(size(rxWaveformUE1)));
-    % rxWaveformUE1 = rxWaveformUE1 + noise1;
-
-    % % UE 2: Calculate signal power and add noise
-    % sigPower2 = mean(abs(rxWaveformUE2).^2, 'all');
-    % noisePower2 = sigPower2 / SNR_linear;
-    % noise2 = sqrt(noisePower2/2) * (randn(size(rxWaveformUE2)) + 1j*randn(size(rxWaveformUE2)));
-    % rxWaveformUE2 = rxWaveformUE2 + noise2;
-
     % -----------------------------------------------------------------
     % RX
     % -----------------------------------------------------------------

@@ -1,8 +1,4 @@
-function [MCS, PMI] = csiRsMesurements(carrier, channel, csiConfig, csiReport, pdsch, nLayers, channelType)
-    if nargin < 7
-        channelType = "FlatFading";
-    end        
-
+function [MCS, PMI] = csiRsMesurements(carrier, channel, csiConfig, csiReport, pdsch, nLayers)
     % -----------------------------------------------------------------
     % Parameters
     % -----------------------------------------------------------------
@@ -23,12 +19,7 @@ function [MCS, PMI] = csiRsMesurements(carrier, channel, csiConfig, csiReport, p
     % -----------------------------------------------------------------
     % Channel
     % -----------------------------------------------------------------
-    if channelType == "PropagateAndSync"
-            rxWaveform = channelPropagateAndSync( ...
-                txWaveform, carrier, channel, csirsInd, csirsSym, 20);
-    else
-        rxWaveform = channel(txWaveform);
-    end
+    rxWaveform = channel(txWaveform);
     
     % -----------------------------------------------------------------
     % CSI RX and Mesurement
