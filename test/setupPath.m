@@ -5,6 +5,7 @@ function setupPath()
     
     pdschDir = fullfile(projectDir, 'pdsch');
     addpath(pdschDir);
-    
-    disp('Đã thêm thư mục "pdsch" vào đường dẫn MATLAB.');
+
+    internalDir = fullfile(projectDir, 'internal');
+    addpath(internalDir);
 end

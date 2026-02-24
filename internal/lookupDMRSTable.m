@@ -1,75 +1,125 @@
-function [dmrssymbolset,ldash] = lookupDMRSTable(carrierConfig, pdschConfig)
-% lookupDMRSTable: Xác định vị trí DM-RS trong miền thời gian (3GPP TS 38.211)
+function [dmrssymbolset, ldash] = lookupDMRSTable(carrierConfig, pdschConfig)
+% -----------------------------------------------------------
+% LOOKUPDMRSTABLE: Determines Time-Domain DMRS Positions
+% -----------------------------------------------------------
+% Reference: 3GPP TS 38.211, Tables 7.4.1.1.2-3 & 7.4.1.1.2-4.
+%
+% Inputs:
+%   carrierConfig : Struct {SymbolsPerSlot}
+%   pdschConfig   : Struct {SymbolAllocation, MappingType, DMRS...}
+%       - SymbolAllocation: [Start, Length]
+%       - MappingType     : 'A' (Slot-based) or 'B' (Symbol-based)
+%       - DMRS.DMRSLength : 1 (Single) or 2 (Double)
+%
+% Outputs:
+%   dmrssymbols : [1 x N] Vector of 0-based symbol indices for DM-RS.
+%   ldash       : [1 x N] Delta indicator for Double Symbol pairs.
+%                 0 = First symbol of pair, 1 = Second symbol.
+% -----------------------------------------------------------
 
     % =====================================================================
-    % 1. ĐỊNH NGHĨA BẢNG (Tables 7.4.1.1.2-3 & 7.4.1.1.2-4)
+    % DEFINE LOOKUP TABLES (TS 38.211 Section 7.4.1.1.2)
     % =====================================================================
-    % 0: l0 (symbol đầu), -1: l1 (symbol 11/12)
-    
-    % --- Single Symbol Tables (Type A) ---
+    % Structure: Cell Array {Rows, Cols}
+    %   - Rows: Duration 'ld' in symbols (1 to 14).
+    %   - Cols: DMRS Additional Position (0, 1, 2, 3).
+    %   - Content: Relative symbol indices (0 represents l0 or start).
+    % =====================================================================
+
+    % -----------------------------------------------------------
+    % 1. Single Symbol Type A (Table 7.4.1.1.2-3)
+    % Note: '0' is a placeholder for l0 (which is 2 or 3).
+    % -----------------------------------------------------------
     dmrs_singleA = {
-        [],[],  [],  [];                %  1
-        [],[],  [],  [];                %  2
-        0,  0,  0,    0;                %  3
-        0,  0,  0,    0;                %  4
-        0,  0,  0,    0;                %  5
-        0,  0,  0,    0;                %  6
-        0,  0,  0,    0;                %  7
-        0,  [0,7],  [0,7],  [0,7];      %  8
-        0,  [0,7],  [0,7],  [0,7];      %  9
-        0,  [0,9], [0,6,9], [0,6,9];    % 10
-        0,  [0,9], [0,6,9], [0,6,9];    % 11
-        0,  [0,9], [0,6,9], [0,5,8,11]; % 12
-        0, [0,-1], [0,7,11],[0,5,8,11]; % 13
-        0, [0,-1], [0,7,11],[0,5,8,11]; % 14
+        [],[],  [],  [];                %  1 symbol
+        [],[],  [],  [];                %  2 symbol
+        0,  0,  0,    0;                %  3 symbol
+        0,  0,  0,    0;                %  4 symbol
+        0,  0,  0,    0;                %  5 symbol
+        0,  0,  0,    0;                %  6 symbol
+        0,  0,  0,    0;                %  7 symbol
+        0,  [0,7],  [0,7],  [0,7];      %  8 symbol
+        0,  [0,7],  [0,7],  [0,7];      %  9 symbol
+        0,  [0,9], [0,6,9], [0,6,9];    % 10 symbol
+        0,  [0,9], [0,6,9], [0,6,9];    % 11 symbol
+        0,  [0,9], [0,6,9], [0,5,8,11]; % 12 symbol
+        0,  [0,11],[0,7,11],[0,5,8,11]; % 13 symbol
+        0,  [0,11],[0,7,11],[0,5,8,11]; % 14 symbol
     };
 
-    % --- Single Symbol Tables (Type B) ---
+    % -----------------------------------------------------------
+    % 2. Single Symbol Type B (Table 7.4.1.1.2-3)
+    % Note: Values are relative to PDSCH Start Symbol.
+    % -----------------------------------------------------------
     dmrs_singleB = {
-        [],[],  [],  [];                %  1
-         0, 0,   0,   0;                %  2
-         0, 0,   0,   0;                %  3
-         0, 0,   0,   0;                %  4
-         0,[0,4],[0,4],  [0,4];         %  5
-         0,[0,4],[0,4],  [0,4];         %  6
-         0,[0,4],[0,4],  [0,4];         %  7
-         0,[0,6],[0,3,6],[0,3,6];       %  8
-         0,[0,7],[0,4,7],[0,4,7];       %  9
-         0,[0,7],[0,4,7],[0,4,7];       % 10
-         0,[0,8],[0,4,8],[0,3,6,9];     % 11
-         0,[0,9],[0,5,9],[0,3,6,9];     % 12
-         0,[0,9],[0,5,9],[0,3,6,9];     % 13
-        [],[],  [],  [];                % 14
+        [],[],  [],  [];            %  1 symbol
+        0, 0,   0,   0;             %  2 symbol
+        0, 0,   0,   0;             %  3 symbol
+        0, 0,   0,   0;             %  4 symbol
+        0,[0,4],[0,4],  [0,4];      %  5 symbol
+        0,[0,4],[0,4],  [0,4];      %  6 symbol 
+        0,[0,4],[0,4],  [0,4];      %  7 symbol 
+        0,[0,6],[0,3,6],[0,3,6];    %  8 symbol
+        0,[0,7],[0,4,7],[0,4,7];    %  9 symbol     
+        0,[0,7],[0,4,7],[0,4,7];    % 10 symbol             
+        0,[0,8],[0,4,8],[0,3,6,9];  % 11 symbol         
+        0,[0,9],[0,5,9],[0,3,6,9];  % 12 symbol             
+        0,[0,9],[0,5,9],[0,3,6,9];  % 13 symbol
+        [],[],  [],  [];            % 14 symbol
     };
 
-    % --- Double Symbol Tables (Type A) ---
+    % -----------------------------------------------------------
+    % 3. Double Symbol Type A (Table 7.4.1.1.2-4)
+    % -----------------------------------------------------------
     dmrs_doubleA = {
-        [],[]; [],[]; [],[];            % 1-3
-        0,0; 0,0; 0,0; 0,0; 0,0; 0,0;   % 4-9
-        0,[0,8]; 0,[0,8]; 0,[0,8];      % 10-12
-        0,[0,10]; 0,[0,10]              % 13-14
+        [],[], [];     %  1 symbol
+        [],[], [];     %  2 symbol
+        [],[], [];     %  3 symbol
+        0, 0, [];      %  4 symbol
+        0, 0, [];      %  5 symbol
+        0, 0, [];      %  6 symbol
+        0, 0, [];      %  7 symbol
+        0, 0, [];      %  8 symbol
+        0, 0, [];      %  9 symbol
+        0,[0,8], [];   % 10 symbol
+        0,[0,8], [];   % 11 symbol
+        0,[0,8], [];   % 12 symbol
+        0,[0,10], [];  % 13 symbol
+        0,[0,10], [];  % 14 symbol
     };
 
-    % --- Double Symbol Tables (Type B) ---
+    % -----------------------------------------------------------
+    % 4. Double Symbol Type B (Table 7.4.1.1.2-4)
+    % -----------------------------------------------------------
     dmrs_doubleB = {
-        [],[]; [],[]; [],[]; [],[];     % 1-4
-        0,0; 0,0; 0,0;                  % 5-7
-        0,[0,5]; 0,[0,5];               % 8-9
-        0,[0,7]; 0,[0,7];               % 10-11
-        0,[0,8]; 0,[0,8];               % 12-13
-        [],[]                           % 14
+        [],[], [];    %  1 symbol
+        [],[], [];    %  2 symbol
+        [],[], [];    %  3 symbol
+        [],[], [];    %  4 symbol
+        0, 0, [];     %  5 symbol 
+        0, 0, [];     %  6 symbol 
+        0, 0, [];     %  7 symbol 
+        0,[0,5], [];  %  8 symbol 
+        0,[0,5], [];  %  9 symbol 
+        0,[0,7], [];  % 10 symbol 
+        0,[0,7], [];  % 11 symbol 
+        0,[0,8], [];  % 12 symbol 
+        0,[0,8], [];  % 13 symbol 
+        [],[], [];    % 14 symbol
     };
 
     % =====================================================================
-    % 2. XỬ LÝ CẤU HÌNH
+    % CONFIGURATION PARSING & TABLE SELECTION
     % =====================================================================
     dmrsConfig = pdschConfig.DMRS;
-    symbperslot = carrierConfig.SymbolsPerSlot;
+    symbPerSlot = carrierConfig.SymbolsPerSlot;
     
-    % Kiểm tra Mapping Type A hay B
-    isTypeA = strcmp(pdschConfig.MappingType, 'A'); 
-
-    % Chọn bảng
+    % Default to Mapping Type A if not specified
+    isTypeA = strcmpi(pdschConfig.MappingType, 'A');
+    
+    % -----------------------------------------------------------
+    % Select Table based on DMRS Length (1 or 2) and Mapping Type
+    % -----------------------------------------------------------
     if dmrsConfig.DMRSLength == 1
         if isTypeA
             selectedTable = dmrs_singleA;
@@ -77,6 +127,7 @@ function [dmrssymbolset,ldash] = lookupDMRSTable(carrierConfig, pdschConfig)
             selectedTable = dmrs_singleB;
         end
     else
+        % Double Symbol (Length 2)
         if isTypeA
             selectedTable = dmrs_doubleA;
         else
@@ -84,77 +135,107 @@ function [dmrssymbolset,ldash] = lookupDMRSTable(carrierConfig, pdschConfig)
         end
     end
 
-    % Xác định l0 cho Type A
-    if isfield(dmrsConfig, 'DMRSTypeAPosition') && ...
-       (dmrsConfig.DMRSTypeAPosition == 3 || strcmp(dmrsConfig.DMRSTypeAPosition, 'pos3'))
-        l0_typeA = 3;
-    else
-        l0_typeA = 2; 
+    % -----------------------------------------------------------
+    % Determine l0 (First DMRS Position) for Type A
+    % l0 is absolute symbol index (2 or 3) determined by RRC.
+    % -----------------------------------------------------------
+    if isTypeA
+        if (dmrsConfig.DMRSTypeAPosition == 3 || strcmpi(dmrsConfig.DMRSTypeAPosition, 'pos3'))
+            l0_typeA = 3;
+        else
+            l0_typeA = 2; % Default pos2
+        end
     end
 
-    % Index cho cột (pos0=1, pos1=2...)
+    % -----------------------------------------------------------
+    % Determine Column Index
+    % Maps AdditionalPosition {0,1,2,3} to indices {1,2,3,4}
+    % -----------------------------------------------------------
     colIdx = dmrsConfig.DMRSAdditionalPosition + 1;
 
     % =====================================================================
-    % 3. TÍNH DURATION & TRA BẢNG
+    % DURATION CALCULATION (ld)
     % =====================================================================
+    % PDSCH Allocation: [Start, Length]
     nPDSCHStart = pdschConfig.SymbolAllocation(1);
-    nPDSCHSym = pdschConfig.SymbolAllocation(end);
+    nPDSCHLen   = pdschConfig.SymbolAllocation(2);
     
-    symbolset = nPDSCHStart : nPDSCHStart + nPDSCHSym - 1;
-    symbolset = symbolset(symbolset < symbperslot);
-
-    [lb, ub] = bounds(symbolset);
+    % Define the valid symbol range for validation later
+    symbolRange = nPDSCHStart : (nPDSCHStart + nPDSCHLen - 1);
+    
+    % -----------------------------------------------------------
+    % Calculate 'ld' (Duration in symbols for table lookup)
+    % Type A: ld = End Symbol Index (referenced from slot start)
+    % Type B: ld = Actual PDSCH Length
+    % -----------------------------------------------------------
     if isTypeA
-        lb = 0; % Type A tính thời lượng từ đầu slot
-    end
-    nsymbols = ub - lb + 1;
-
-    if dmrsConfig.DMRSLength == 2 && nsymbols <= 4
-        error('Invalid DMRSLength=2 for l_d <= 4');
+        ld = nPDSCHStart + nPDSCHLen; 
+    else
+        ld = nPDSCHLen;
     end
 
-
-    % Tra cứu
-    rawSymbols = [];
-    if nsymbols > 0 && nsymbols <= size(selectedTable, 1) && colIdx <= size(selectedTable, 2)
-        rawSymbols = selectedTable{nsymbols, colIdx};
+    % Safety Check: Ensure lookup indices are within table bounds
+    if ld > size(selectedTable, 1) || colIdx > size(selectedTable, 2)
+        dmrssymbolset = []; ldash = [];
+        return; 
     end
+
+    % -----------------------------------------------------------
+    % Retrieve Raw Positions
+    % rawSymbols contains relative indices or '0' placeholders
+    % -----------------------------------------------------------
+    rawSymbols = selectedTable{ld, colIdx};
 
     if isempty(rawSymbols)
-        dmrssymbolset = []; ldash = []; return;
+        dmrssymbolset = []; ldash = [];
+        return;
     end
 
-    if rawSymbols(end) == -1, rawSymbols(end) = 11; end
-
     % =====================================================================
-    % 4. MAP VÀO RESOURCE GRID & EXPAND
+    % MAPPING & EXPANSION
     % =====================================================================
+    
+    % -----------------------------------------------------------
+    % Adjust Positions based on Mapping Type
+    % -----------------------------------------------------------
     if isTypeA
         dmrssymbolset = rawSymbols;
-        if ~isempty(dmrssymbolset), dmrssymbolset(1) = l0_typeA; end
+        % Replace placeholder '0' with actual l0 value (2 or 3)
+        if ~isempty(dmrssymbolset)
+             dmrssymbolset(dmrssymbolset == 0) = l0_typeA;
+        end
     else
+        % Type B: Values are relative to PDSCH Start
         dmrssymbolset = rawSymbols + nPDSCHStart;
     end
 
-    % Expand Double Symbol
+    % -----------------------------------------------------------
+    % Double Symbol Expansion (DMRS Length = 2)
+    % -----------------------------------------------------------
     if dmrsConfig.DMRSLength == 2
-        % [l1, l2] -> [l1, l1+1, l2, l2+1]
-        dmrssymbolset = [dmrssymbolset; dmrssymbolset+1];
-        dmrssymbolset = dmrssymbolset(:).';
+        % Expand each symbol 'l' into pair '[l, l+1]'
+        % Matrix construction:
+        %   Row 1: Original symbols
+        %   Row 2: Original + 1
+        dmrssymbolset = [dmrssymbolset; dmrssymbolset + 1];
+        
+        % Flatten column-wise to keep pairs together: [l1, l1+1, l2, l2+1...]
+        dmrssymbolset = dmrssymbolset(:).'; 
+        
+        % ldash: 0 for first symbol, 1 for second symbol of the pair
         ldash = repmat([0, 1], 1, length(dmrssymbolset)/2);
     else
         ldash = zeros(size(dmrssymbolset));
     end
 
     % =====================================================================
-    % 5. FILTERING: CHỈ GIỮ LẠI SYMBOL HỢP LỆ
+    % VALIDATION
     % =====================================================================
-    % Loại bỏ các DM-RS nằm ngoài vùng cấp phát của PDSCH
-    validMask = ismember(dmrssymbolset, symbolset);
-
-    if isempty(dmrssymbolset)
-        error('No valid DM-RS symbols inside PDSCH allocation');
+    % Filter out symbols that fall outside the PDSCH allocation or Slot
+    validMask = ismember(dmrssymbolset, symbolRange) & (dmrssymbolset < symbPerSlot);
+    
+    if ~any(validMask)
+        warning('No valid DM-RS symbols found within PDSCH allocation.');
     end
     
     dmrssymbolset = dmrssymbolset(validMask);
