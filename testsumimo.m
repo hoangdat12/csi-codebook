@@ -16,7 +16,7 @@ SNR_dB = 20;
 % Rayleigh || AWGN || Ideal || TDL
 % With Ideal channel, we can't choose the PMI orthogonal 
 % Because of all channel use the same PMI
-channelType = "TDL";
+channelType = "AWGN";
 channel = getChannel(channelType, SNR_dB, nRxAnts, 1, sampleRate); 
 
 % -----------------------------------------------------------------
@@ -126,7 +126,8 @@ txGrid(dmrsAntInd) = dmrsAntSym;
 % -----------------------------------------------------------------
 % Channel
 % -----------------------------------------------------------------
-rxWaveform = channel(txWaveform);
+% rxWaveform = channel(txWaveform);
+rxWaveform = txWaveform;
 
 % -----------------------------------------------------------------
 % RX and Calculate BER
