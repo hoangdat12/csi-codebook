@@ -10,7 +10,14 @@ SUBBAND_AMPLITUDE = true;
 N1 = 4; N2 = 1; O1 = 4; O2 = 1;
 NUMBER_OF_BEAMS = 2;
 PHASE_ALPHABET_SIZE = 4;
-MCS = 12;
+MCS = 12; % 6 517 3.0293
+
+% TBS size % Done
+% 14 symbols 1 slot % Done
+% slot 0 % Done
+% 1 layer 1 port 
+% 1 frame % Done
+% DMRS type % Done
 
 % Currently support 2 or 4 layers
 if NUMBER_OF_BEAMS == 2
@@ -40,6 +47,9 @@ carrier = nrCarrierConfig;
 % https://www.etsi.org/deliver/etsi_ts/138100_138199/13810101/17.08.00_60/ts_13810101v170800p.pdf
 carrier.SubcarrierSpacing = 30;  
 carrier.NSizeGrid = 273;
+carrier.CyclicPrefix = "normal";
+carrier.NSlot = 0;
+carrier.NFrame = 0;
 
 % -----------------------------------------------------------------
 % Codebook Configuration
@@ -60,17 +70,14 @@ cfg.numLayers = NLAYERS;
 pdsch = customPDSCHConfig(); 
 
 pdsch.CodebookConfig = cfg;
-pdsch.DMRS.DMRSConfigurationType = 1;
-pdsch.DMRS.DMRSAdditionalPosition = 1;
+pdsch.DMRS.DMRSConfigurationType = 1; % [0, 2, 4, 6, 10]
+pdsch.DMRS.DMRSAdditionalPosition = 0; % 1 dmrs
+pdsch.DMRS.DMRSTypeAPosition = 2; % symbols 2
+pdsch.DMRS.NumCDMGroupsWithoutData = 2; % Default
 pdsch.NumLayers = NLAYERS;
+pdsch.MappingType = 'A'; % PDSCH Start at 2 or 3
 % 273 PRB
 pdsch.PRBSet = 0:272;
-
-% -----------------------------------------------------------------
-% Mesurements
-% -----------------------------------------------------------------
-% [MCS, PMI] = csiRsMesurements(carrier, channel, csiConfig, csiReport, pdsch, NLAYERS);
-% MCS = 
 
 pdsch.Indices.i1 = {i11, i12, i13, i14};
 pdsch.Indices.i2 = {i21, i22};
@@ -87,6 +94,15 @@ NREPerPRB = pdschInfo.NREPerPRB;
 
 TBS = nrTBS(pdsch.Modulation, pdsch.NumLayers, ...
             length(pdsch.PRBSet), NREPerPRB, pdsch.TargetCodeRate);
+% Manual
+% dmrsReTotalPerPRB = length([0, 2, 4, 6, 8, 10]) * pdsch.DMRS.NumCDMGroupsWithoutData;
+% dmrsReTotal = length(pdsch.PRBSet) * dmrsReTotalPerPRB * 1;
+% pdschReTotal = length(pdsch.PRBSet) * 12 * 14;
+
+% pdschReAvailable = pdschReTotal - dmrsReTotal;
+
+% pdschAllocation = ceil(pdschReAvailable * 6  * 2 * pdsch.TargetCodeRate);
+
 inputBits = randi([0 1], TBS, 1);
 
 % -----------------------------------------------------------------
@@ -102,41 +118,55 @@ dmrsSym = nrPDSCHDMRS(carrier, pdsch);
 dmrsInd = nrPDSCHDMRSIndices(carrier, pdsch);
 [dmrsAntSym, dmrsAntInd] = nrPDSCHPrecode(carrier, dmrsSym, dmrsInd, W_transposed);
 
+% Frame Grid
+frameGrid = ResourceGrid(carrier, 2 * cfg.N1 * cfg.N2);
+% Slot grid
 txGrid = nrResourceGrid(carrier, 2 * cfg.N1 * cfg.N2); 
+
+% Mapping on slot 0
 txGrid(antind) = antsym;
 txGrid(dmrsAntInd) = dmrsAntSym;  
 
-[txWaveform, waveformInfo] = nrOFDMModulate(carrier, txGrid);
+symbolsPerSlot = carrier.SymbolsPerSlot;
+currentSlotIdx = carrier.NSlot; 
+
+startSym = currentSlotIdx * symbolsPerSlot + 1;
+endSym = (currentSlotIdx + 1) * symbolsPerSlot;
+
+% Extended to all Frame
+frameGrid(:, startSym:endSym, :) = txGrid;
+
+[txWaveform, waveformInfo] = nrOFDMModulate(carrier, frameGrid);
 
 
-% -----------------------------------------------------------------
-% Channel
-% -----------------------------------------------------------------
-channel = nrTDLChannel;
-channel.NumTransmitAntennas = 8;
-channel.NumReceiveAntennas = 4;
-channel.SampleRate = 61440000;
-channel.DelayProfile = 'TDL-C';
-channel.DelaySpread = 0;
-channel.Seed = 1;
-channel.MaximumDopplerShift = 5;
+% % -----------------------------------------------------------------
+% % Channel
+% % -----------------------------------------------------------------
+% channel = nrTDLChannel;
+% channel.NumTransmitAntennas = 8;
+% channel.NumReceiveAntennas = 4;
+% channel.SampleRate = 61440000;
+% channel.DelayProfile = 'TDL-C';
+% channel.DelaySpread = 0;
+% channel.Seed = 1;
+% channel.MaximumDopplerShift = 5;
 
-rxWaveform = channel(txWaveform);
+% rxWaveform = channel(txWaveform);
 
-signalPower = var(rxWaveform);
+% signalPower = var(rxWaveform);
 
-signalPower_dBW = 10 * log10(mean(signalPower));
-noisePower_dBW = signalPower_dBW - 20;
-noiseVariance = 10^(noisePower_dBW / 10);
-noise = sqrt(noiseVariance / 2) * (randn(size(rxWaveform)) + 1i * randn(size(rxWaveform)));
-rxWaveform = rxWaveform + noise;
+% signalPower_dBW = 10 * log10(mean(signalPower));
+% noisePower_dBW = signalPower_dBW - 20;
+% noiseVariance = 10^(noisePower_dBW / 10);
+% noise = sqrt(noiseVariance / 2) * (randn(size(rxWaveform)) + 1i * randn(size(rxWaveform)));
+% rxWaveform = rxWaveform + noise;
 
-% -----------------------------------------------------------------
-% RX and Calculate BER
-% -----------------------------------------------------------------
-rxBits = rxPDSCHDecode(carrier, pdsch, rxWaveform, txWaveform, TBS);
+% % -----------------------------------------------------------------
+% % RX and Calculate BER
+% % -----------------------------------------------------------------
+% rxBits = rxPDSCHDecode(carrier, pdsch, rxWaveform, txWaveform, TBS);
 
-numErrors = biterr(double(inputBits), double(rxBits));
-BER = numErrors / TBS;
+% numErrors = biterr(double(inputBits), double(rxBits));
+% BER = numErrors / TBS;
 
-fprintf('BER: %.5f. \n', BER);
+% fprintf('BER: %.5f. \n', BER);
