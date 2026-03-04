@@ -92,22 +92,23 @@ inputBits = randi([0 1], TBS, 1);
 % -----------------------------------------------------------------
 % PDSCH Modulation
 % -----------------------------------------------------------------
-[layerMappedSym, pdschInd] = PDSCHEncode(pdsch, carrier, inputBits);
+[layerMappedSym, pdschInd] = myPDSCHEncode(pdsch, carrier, inputBits);
+dataIndices = PDSCHIndices(carrier, pdsch);
+
+dmrsSym = genDMRS(carrier, pdsch);
+dmrsInd = DMRSIndices(pdsch, carrier);
+
+nPorts = 2 * cfg.N1 * cfg.N2;
+txGrid = ResourceGrid(carrier, nPorts); 
+
+txGrid(dataIndices) = layerMappedSym;
+txGrid(dmrsInd) = dmrsSym;
 
 W = generateTypeIIPrecoder(pdsch, pdsch.Indices.i1, pdsch.Indices.i2, true);
 
-W_transposed = W.';
-[antsym, antind] = nrPDSCHPrecode(carrier, layerMappedSym, pdschInd, W_transposed);
-dmrsSym = nrPDSCHDMRS(carrier, pdsch);
-dmrsInd = nrPDSCHDMRSIndices(carrier, pdsch);
-[dmrsAntSym, dmrsAntInd] = nrPDSCHPrecode(carrier, dmrsSym, dmrsInd, W_transposed);
+txGridAntennas = precoding(txGrid, W);
 
-txGrid = nrResourceGrid(carrier, 2 * cfg.N1 * cfg.N2); 
-txGrid(antind) = antsym;
-txGrid(dmrsAntInd) = dmrsAntSym;  
-
-[txWaveform, waveformInfo] = nrOFDMModulate(carrier, txGrid);
-
+[txWaveform, waveformInfo] = nrOFDMModulate(carrier, txGridAntennas);
 
 % -----------------------------------------------------------------
 % Channel

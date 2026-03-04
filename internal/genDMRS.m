@@ -1,21 +1,11 @@
-function [dmrssymbols, dmrs_values] = genDMRS(carrier, pdsch, enabledR16)
+function dmrs_values = genDMRS(carrier, pdsch, enabledR16)
 % -----------------------------------------------------------
 % GENDMRS: Generates DMRS complex symbols (Type 1 & Type 2)
 % -----------------------------------------------------------
-% Inputs:
-%   carrier    : struct {NSlot, NCellID, SymbolsPerSlot, ...}
-%   pdsch      : struct {DMRS, PRBSet, SymbolAllocation, ...}
-%   enabledR16 : boolean flag for Rel-16 features
-%
-% Outputs:
-%   dmrssymbols : [1 x N] Indices of symbols containing DMRS (0-based)
-%   dmrs_values : [M x 1] Complex QPSK symbols for the DMRS sequence
-% -----------------------------------------------------------
+    if nargin < 3
+        enabledR16 = false;
+    end
 
-    % -----------------------------------------------------------
-    % Determine DMRS positions in the time domain.
-    % Returns sorted symbol indices (e.g., [2, 11]).
-    % -----------------------------------------------------------
     [dmrssymbols, ~] = lookupDMRSTable(carrier, pdsch);
     
     if isempty(dmrssymbols)
@@ -23,115 +13,78 @@ function [dmrssymbols, dmrs_values] = genDMRS(carrier, pdsch, enabledR16)
         return;
     end
 
-    % -----------------------------------------------------------
-    % Calculate c_init (scrambling seed) for each identified symbol.
-    % c_init changes per OFDM symbol slot and symbol index 'l'.
-    % -----------------------------------------------------------
     c_init_list = generateCInit(pdsch.DMRS, carrier, dmrssymbols, enabledR16);
 
-    % -----------------------------------------------------------
-    % Determine Frequency Domain Density.
-    % + DMRS Type 1: 6 subcarriers/RB (Every other subcarrier).
-    % + DMRS Type 2: 4 subcarriers/RB (2 groups of 2 adjacent SCs).
-    % -----------------------------------------------------------
     if pdsch.DMRS.DMRSConfigurationType == 2
         N_DMRS_SC = 4;
     else
-        N_DMRS_SC = 6; % Default Type 1
+        N_DMRS_SC = 6; 
     end
 
-    % -----------------------------------------------------------
-    % Get Resource Block (RB) allocation.
-    % PRBSet usually contains 0-based indices relative to the BWP.
-    % -----------------------------------------------------------
     PRBSet = pdsch.PRBSet;
-    
-    % -----------------------------------------------------------
-    % Calculate the absolute RB reference point for Sequence Generation.
-    % The DMRS sequence is pseudo-random and anchored to a common reference
-    % point (usually Point A or CRB 0) to ensure phase continuity across
-    % multiple UEs (MU-MIMO).
-    % -----------------------------------------------------------
     numRBs = length(PRBSet);
     startRB_in_BWP = PRBSet(1);
     
     rbrefpoint = 0; 
-    
     if strcmpi(pdsch.DMRS.DMRSReferencePoint, 'CRB0')
         rbrefpoint = double(carrier.NStartGrid);
     end
     
-    % The absolute RB index in the Common Grid
     absolute_startRB = rbrefpoint + startRB_in_BWP;
 
-    % -----------------------------------------------------------
-    % PREALLOCATION: Optimize memory usage
-    % -----------------------------------------------------------
-    
-    % Total subcarriers containing DMRS in one OFDM symbol
     numSubcarriersPerSymbol = N_DMRS_SC * numRBs;
-    
-    % Total elements = (Number of Symbols) * (Subcarriers per Symbol)
     total_elements = length(dmrssymbols) * numSubcarriersPerSymbol;
     
-    % Preallocate output as complex double
-    dmrs_values = complex(zeros(total_elements, 1));
+    dmrs_values = complex(zeros(total_elements, pdsch.NumLayers));
+    
+    % Extract OCC Weights matrices from pdsch.DMRS structure
+    fmaskAllPorts = pdsch.DMRS.FrequencyWeights;
+    tmaskAllPorts = pdsch.DMRS.TimeWeights;
     
     for i = 1:length(dmrssymbols)
-        % Retrieve pre-calculated c_init for this specific symbol
         c_init = c_init_list(i);
         
-        % -----------------------------------------------------------
-        % Calculate Sequence Length & Offset
-        % The Gold Sequence generator runs theoretically from CRB 0.
-        % We must generate bits covering the gap from CRB 0 to our Start RB,
-        % then discard the "offset" bits.
-        % -----------------------------------------------------------
-        
-        % 1. Offset Bits: "Virtual" bits from CRB 0 to StartRB.
-        %    Each DMRS subcarrier uses 2 bits (QPSK).
         offset_bits = 2 * N_DMRS_SC * absolute_startRB;
-        
-        % 2. Needed Bits: The actual bits for the allocated bandwidth.
         needed_bits = 2 * N_DMRS_SC * numRBs;
-        
-        % 3. Total Bits: Sum to feed the generator.
         total_bits_to_gen = offset_bits + needed_bits;
         
-        % -----------------------------------------------------------
-        % Generate the Gold Sequence (Length-31)
-        % -----------------------------------------------------------
         full_seq_bits = GoldSequence(c_init, total_bits_to_gen);
-        
-        % -----------------------------------------------------------
-        % Slice and Format
-        % -----------------------------------------------------------
-        
-        % Discard the offset bits (prefix)
         useful_bits = full_seq_bits(offset_bits + 1 : end);
         
-        % -----------------------------------------------------------
-        % QPSK Modulation
-        % Formula: 1/sqrt(2) * [(1 - 2*b(2i)) + j*(1 - 2*b(2i+1))]
-        % Maps: 0 -> +1, 1 -> -1
-        % -----------------------------------------------------------
-        
-        % Reshape to [2 x NumREs]: Row 1 = Real Bits, Row 2 = Imag Bits
         bit_pairs = reshape(useful_bits, 2, []); 
-        
         real_part = (1 - 2 * bit_pairs(1, :)) / sqrt(2);
         imag_part = (1 - 2 * bit_pairs(2, :)) / sqrt(2);
         
-        % Create complex symbol vector
         complex_symbol_vector = complex(real_part, imag_part).';
         
-        % -----------------------------------------------------------
-        % Store in Output Array
-        % -----------------------------------------------------------
         startIndex = (i - 1) * numSubcarriersPerSymbol + 1;
         endIndex = i * numSubcarriersPerSymbol;
         
-        dmrs_values(startIndex:endIndex) = complex_symbol_vector;
+        % -----------------------------------------------------------
+        % APPLY OCC: Frequency & Time Weights per Layer
+        % -----------------------------------------------------------
+        
+        % 1. Determine l' (time index for TimeWeight)
+        % l_prime = 1 if this is the 2nd symbol in a double-symbol pair, else 0
+        l_prime = 0;
+        if i > 1 && (dmrssymbols(i) == dmrssymbols(i-1) + 1)
+            l_prime = 1;
+        end
+        
+        % 2. Iterate over Layers to multiply Weights and assign
+        for layerIdx = 1:pdsch.NumLayers
+            % Extract time-domain weight for the current symbol (1-based index)
+            wt = tmaskAllPorts(l_prime + 1, layerIdx);
+            
+            % Extract frequency-domain weight for the current layer
+            wf = fmaskAllPorts(:, layerIdx);
+            
+            % Replicate wf sequence across the allocated bandwidth
+            wf_pattern = repmat(wf, numSubcarriersPerSymbol / length(wf), 1);
+            
+            % Multiply base sequence by OCC and store in respective layer column
+            dmrs_values(startIndex:endIndex, layerIdx) = complex_symbol_vector .* wf_pattern .* wt;
+        end
     end
 end
 

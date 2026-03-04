@@ -123,7 +123,7 @@ pdsch.PRBSet = 0:272;
 % -----------------------------------------------------------------
 % Preparation
 % -----------------------------------------------------------------
-[all_W, channelList, MCS_List] = prepareData(...
+[all_W, channelList, MCS_List, PMIList] = prepareData(...
         NumUEs, carrier, csiConfig, csiReport, pdsch, sampleRate,...
         nRxAnts, SNR_dB, nLayers, channelType ...
     );
@@ -142,6 +142,7 @@ unPairedUEs = schedulingList.unPair;
 % -----------------------------------------------------------------
 % MU MIMO
 % -----------------------------------------------------------------
+pairPMI = cell(length(pairedUEs), 1);
 for idx = 1:length(pairedUEs)
     transmittUEPair = pairedUEs(idx);
 
@@ -159,6 +160,10 @@ for idx = 1:length(pairedUEs)
 
     UE1Infor = struct('id', idx1, 'W', W1, 'MCS', MCS1, 'channel', H1);
     UE2Infor = struct('id', idx2, 'W', W2, 'MCS', MCS2, 'channel', H2);
+    
+    PMIUE1 = PMIList{idx1};
+    PMIUE2 = PMIList{idx2};
+    pairPMI{idx} = struct('PMIUE1', PMIUE1, 'PMIUE2', PMIUE2);
 
     [BER1, BER2] = muMimo(carrier, pdsch, UE1Infor, UE2Infor, SNR_dB);
 
@@ -208,7 +213,7 @@ end
 %   - MCS_List: MCS select after evaluate the CQI Report
 % -----------------------------------------------------------------
 function [...
-    all_W, channelList, MCS_List] = ...
+    all_W, channelList, MCS_List, PMIList] = ...
 prepareData(...
         NumUEs, carrier, csiConfig, csiReport, pdsch, sampleRate,...
         nRxAnts, SNR_dB, nLayers, channelType...
@@ -220,6 +225,7 @@ prepareData(...
     % Initial W
     all_W = cell(1, NumUEs);
     MCS_List = cell(1, NumUEs);
+    PMIList = cell(1, NumUEs);
 
     % Codebook Config - The same for all UE
     cfg = struct();
@@ -246,6 +252,8 @@ prepareData(...
         MCS_List{ueIdx} = MCS;
         
         all_W{ueIdx} = W;
+
+        PMIList{ueIdx} = PMI;
     end
 end
 

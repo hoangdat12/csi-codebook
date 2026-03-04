@@ -76,8 +76,8 @@ function cbs = cbSegmentation(in, bgn)
             s = s + cbz;
 
             % --- Attach CRC24B ---
-            crc = createCRC(data.', '24B');   % row vector input
-            cbCRC(:,r) = [data; crc(:)];
+            encoded_block = createCRC(data.', '24B');   
+            cbCRC(:,r) = encoded_block(:);
         end
     end
 

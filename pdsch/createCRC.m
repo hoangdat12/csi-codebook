@@ -1,17 +1,17 @@
 % ------------------------------------------------------------------
-% This function use to generate a CRC sequence.
-% The length of this sequence depended on the TYPE parameters.
-% The output format: [1 x L]
+% This function is used to generate a CRC sequence and append it to data.
+% The length of the CRC sequence depends on the TYPE parameters.
+% The output format: [1 x (K+L)] where K is data length, L is CRC length.
 % Reference: 5.1 TS 138 212
 % ------------------------------------------------------------------
-function crc_bits = createCRC(data_bits, type)
+function out_bits = createCRC(data_bits, type)
     % CRC generator polynomials (binary vector form, MSB-first)
     poly_CRC24A = [1 1 0 0 0 0 1 1 0 0 1 0 0 1 1 0 0 1 1 1 1 1 0 1 1];
     poly_CRC24B = [1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 0 0 0 1 1]; 
     poly_CRC24C = [1 1 0 1 1 0 0  1 0 1 0 1 1 0 0 0 1 0 0 0 1 0 1 1 1];
     poly_CRC16  = [1 0 0 0 1 0 0 0 0 0 0 1 0 0 0 0 1];                
     poly_CRC11  = [1 1 1 0 0 0 1 0 0 0 0 1];                        
-    poly_CRC6   = [1 1 0 0 0 0 1];                                 
+    poly_CRC6   = [1 1 0 0 0 0 1];                                
 
     % Select polynomial and CRC length
     switch upper(type)
@@ -32,18 +32,21 @@ function crc_bits = createCRC(data_bits, type)
     end
 
     % Ensure row vector, logical for speed
-    data_bits = logical(data_bits(:)');  
+    data_bits_logical = logical(data_bits(:)');  
 
     % Append m zeros for division
-    data_padded = [data_bits, false(1, crc_len)];
+    data_padded = [data_bits_logical, false(1, crc_len)];
 
     % Perform modulo-2 division
-    for i = 1:length(data_bits)
+    for i = 1:length(data_bits_logical)
         if data_padded(i) == 1
             data_padded(i:i+crc_len) = xor(data_padded(i:i+crc_len), poly_val);
         end
     end
 
-    % Extract CRC sequence
-    crc_bits = double(data_padded(end-crc_len+1:end)).';
+    % Extract CRC sequence (kept as row vector)
+    crc_bits = double(data_padded(end-crc_len+1:end));
+    
+    % Output: Transport Block (TB) + CRC bits
+    out_bits = [double(data_bits_logical), crc_bits];
 end

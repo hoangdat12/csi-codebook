@@ -37,7 +37,6 @@ function [MCS, PMI] = csiRsMesurements(carrier, channel, csiConfig, csiReport, p
     % CQISet have difference value, too keep everything simple
     % Temporay use the first one
     [CQISet ,PMISet] = nr5g.internal.nrCQIReport(carrier,csiConfig,csiReport,pdsch.DMRS,nLayers,H,nVar);
-
     % Format output
     [i11,i12,i13,i14, i21, i22] = ...
         extractPMISet(PMISet, nLayers, csiReport.NumberOfBeams * 2, subbandAmplitude);
