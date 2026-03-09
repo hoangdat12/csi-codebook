@@ -32,6 +32,7 @@ NSIZE_GRID = 273;
 CYCLIC_PREFIX = "normal"; % 14 symbols
 NSLOT = 0;
 NFRAME = 0;
+NCELL_ID = 20;
 
 % DMRS Config
 DMRS_CONFIGURATION_TYPE = 1;  % [0, 2, 4, 6, 10]
@@ -42,6 +43,7 @@ DMRS_NUMCDMGROUP_WITHOUT_DATA = 2;
 PDSCH_MAPPING_TYPE = 'A';  % PDSCH Start at 2 or 3
 PDSCH_RNTI = 20000;
 PDSCH_PRBSET = 0:272;
+DMRS_LENGTH = 1;
 
 % -----------------------------------------------------------------
 % Carrier Configuration
@@ -55,6 +57,7 @@ carrier.NSizeGrid = NSIZE_GRID;
 carrier.CyclicPrefix = CYCLIC_PREFIX;
 carrier.NSlot = NSLOT;
 carrier.NFrame = NFRAME;
+carrier.NCellID = NCELL_ID;
 
 % -----------------------------------------------------------------
 % PDSCH Configuration
@@ -65,6 +68,8 @@ pdsch.DMRS.DMRSConfigurationType = DMRS_CONFIGURATION_TYPE;
 pdsch.DMRS.DMRSAdditionalPosition = 0; 
 pdsch.DMRS.DMRSTypeAPosition = DMRS_TYPEA_POSITION; 
 pdsch.DMRS.NumCDMGroupsWithoutData = DMRS_NUMCDMGROUP_WITHOUT_DATA;
+pdsch.DMRS.DMRSLength = DMRS_LENGTH;
+
 pdsch.NumLayers = NLAYERS;
 pdsch.MappingType = PDSCH_MAPPING_TYPE;
 pdsch.RNTI = PDSCH_RNTI;
@@ -73,6 +78,7 @@ pdsch.PRBSet = PDSCH_PRBSET;
 
 % Table 5.1.3.1-2: MCS index table 2 for PDSCH - 138 214
 % https://www.etsi.org/deliver/etsi_ts/138200_138299/138214/18.06.00_60/ts_138214v180600p.pdf
+% In this code using TABLE 2
 pdsch = pdsch.setMCS(MCS);
 
 % -----------------------------------------------------------------
@@ -113,6 +119,34 @@ endSym = (currentSlotIdx + 1) * symbolsPerSlot;
 frameGrid(:, startSym:endSym, :) = txGrid;
 
 [txWaveform, waveformInfo] = nrOFDMModulate(carrier, frameGrid);
+
+% Plot
+figure;
+gridToMap = abs(frameGrid(:,:,1)); 
+
+h = pcolor(gridToMap);
+set(h, 'EdgeColor', 'none');
+
+colormap(jet); 
+colorbar;
+title('5G NR Downlink Resource Grid (1 Layer, 1 Port)');
+xlabel('OFDM Symbols');
+ylabel('Subcarriers');
+
+% Extract
+centerFreq = 0;
+nchannel = 1;
+nFrame = 1;
+scs = 30000;
+data_repeat = repmat(txWaveform , nFrame,1);
+
+fileName = sprintf('PDSCH_%dP%dV', 1, 1);
+
+savevsarecordingmulti([fileName,'.mat'],data_repeat,4096*scs,centerFreq,nchannel);
+
+% ----------------------------------------------------------------------
+% HELPER FUNCTION
+% ----------------------------------------------------------------------
 
 function TBS = manualCalculateTBS(pdsch)
     if pdsch.DMRS.DMRSConfigurationType == 1
