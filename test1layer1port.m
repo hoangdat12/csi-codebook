@@ -13,6 +13,7 @@ setupPath();
 % DMRS type 1
 % PDSCH Mapping Type A
 % RNTI = 20000
+% Cell ID = 20;
 
 % -----------------------------------------------------------------
 % Configuration Parameters
@@ -118,31 +119,41 @@ endSym = (currentSlotIdx + 1) * symbolsPerSlot;
 % Extended to all Frame
 frameGrid(:, startSym:endSym, :) = txGrid;
 
-[txWaveform, waveformInfo] = nrOFDMModulate(carrier, frameGrid);
+NFFT = 4096; % Kích thước IFFT
+numRe = size(frameGrid, 1); % Tổng số subcarriers mang dữ liệu (Ví dụ: 273*12 = 3276)
+numSymb = size(frameGrid, 2); % Tổng số symbol trong frameGrid
 
-% Plot
+datall = frameGrid(:, :, 1); % 1 Port
+
+txDataF1 = [datall(numRe/2+1:end, :); ...
+            zeros(NFFT - numRe, numSymb); ...
+            datall(1:numRe/2, :)];
+
+% Plot data before OFDM
+pcolor(abs(txDataF1));
+shading flat;
+
 figure;
-gridToMap = abs(frameGrid(:,:,1)); 
+imagesc(20*log10(abs(txDataF1) + eps)); 
 
-h = pcolor(gridToMap);
-set(h, 'EdgeColor', 'none');
+set(gca, 'YDir', 'normal'); 
 
-colormap(jet); 
+colormap('turbo'); 
 colorbar;
-title('5G NR Downlink Resource Grid (1 Layer, 1 Port)');
-xlabel('OFDM Symbols');
-ylabel('Subcarriers');
 
-% Extract
+title('Dữ liệu trước khối IFFT (txDataF1)');
+xlabel('OFDM Symbols (Toàn bộ Frame)');
+ylabel('IFFT Bins (NFFT = 4096)');
+
+txdata1 = ofdmModulation(txDataF1, NFFT);
+
 centerFreq = 0;
-nchannel = 1;
-nFrame = 1;
-scs = 30000;
-data_repeat = repmat(txWaveform , nFrame,1);
+nchannel = 1; 
+nFrame = 5; 
+scs = 30000; % SCS 30kHz
+data_repeat = repmat(txdata1, nFrame, 1); 
+savevsarecordingmulti('PDSCH_Waveform_1P1V.mat', data_repeat, NFFT*scs, centerFreq, nchannel);
 
-fileName = sprintf('PDSCH_%dP%dV', 1, 1);
-
-savevsarecordingmulti([fileName,'.mat'],data_repeat,4096*scs,centerFreq,nchannel);
 
 % ----------------------------------------------------------------------
 % HELPER FUNCTION

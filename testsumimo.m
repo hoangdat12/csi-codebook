@@ -129,7 +129,25 @@ endSym = (currentSlotIdx + 1) * symbolsPerSlot;
 % Extended to all Frame
 frameGrid(:, startSym:endSym, :) = txGrid;
 
-[txWaveform, waveformInfo] = nrOFDMModulate(carrier, frameGrid);
+NFFT = 4096; % Kích thước IFFT
+numRe = size(frameGrid, 1); % Tổng số subcarriers mang dữ liệu (Ví dụ: 273*12 = 3276)
+numSymb = size(frameGrid, 2); % Tổng số symbol trong frameGrid
+
+datall = frameGrid(:, :, 8); % 1 Port
+
+txDataF1 = [datall(numRe/2+1:end, :); ...
+            zeros(NFFT - numRe, numSymb); ...
+            datall(1:numRe/2, :)];
+
+txdata1 = ofdmModulation(txDataF1, NFFT);
+
+centerFreq = 0;
+nchannel = 2; 
+nFrame = 5; 
+scs = 30000; % SCS 30kHz
+data_repeat = repmat(txdata1, nFrame, 1); 
+savevsarecordingmulti('PDSCH_Waveform_1P1V.mat', data_repeat, NFFT*scs, centerFreq, nchannel);
+
 
 
 % % -----------------------------------------------------------------
