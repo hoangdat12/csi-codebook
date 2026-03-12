@@ -141,12 +141,12 @@ txDataF1 = [datall(numRe/2+1:end, :); ...
 
 txdata1 = ofdmModulation(txDataF1, NFFT);
 
-centerFreq = 0;
-nchannel = 2; 
-nFrame = 5; 
-scs = 30000; % SCS 30kHz
-data_repeat = repmat(txdata1, nFrame, 1); 
-savevsarecordingmulti('PDSCH_Waveform_1P1V.mat', data_repeat, NFFT*scs, centerFreq, nchannel);
+% centerFreq = 0;
+% nchannel = 2; 
+% nFrame = 5; 
+% scs = 30000; % SCS 30kHz
+% data_repeat = repmat(txdata1, nFrame, 1); 
+% savevsarecordingmulti('PDSCH_Waveform_1P1V.mat', data_repeat, NFFT*scs, centerFreq, nchannel);
 
 
 
