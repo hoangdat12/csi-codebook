@@ -1,22 +1,40 @@
 function TBS = manualCalculateTBS(pdsch)
+    % ---------------------------------------------------------------------
+    % 1. Tính số DMRS REs bị chiếm dụng trong 1 PRB cho MỘT OFDM Symbol
+    % ---------------------------------------------------------------------
     if pdsch.DMRS.DMRSConfigurationType == 1
-        dmrsPatern = [0, 2, 4, 6, 8, 10];
+        % Type 1: Mỗi CDM group có 6 REs / symbol
+        rePerSymbolPerCDM = 6; 
     else
-        dmrsPatern = [1, 2, 6, 7];
+        % Type 2: Mỗi CDM group có 4 REs / symbol
+        rePerSymbolPerCDM = 4;
     end
+    rePerSymbol = rePerSymbolPerCDM * pdsch.DMRS.NumCDMGroupsWithoutData;
 
-    % The number of dmrs re in the prb
-    dmrsRePerPRB = length(dmrsPatern) * pdsch.DMRS.NumCDMGroupsWithoutData;
+    % ---------------------------------------------------------------------
+    % 2. Tính TỔNG SỐ OFDM Symbols chứa DMRS trong 1 Slot
+    % ---------------------------------------------------------------------
+    % Số cụm DMRS = 1 (cụm gốc - Front-loaded) + Số cụm cộng thêm (Additional)
+    numDmrsClusters = 1 + pdsch.DMRS.DMRSAdditionalPosition;
+    
+    % Tổng số Symbol = Độ dài 1 cụm (Length) x Số cụm
+    numDmrsSymbols = pdsch.DMRS.DMRSLength * numDmrsClusters;
 
-    % The number of pdsch re in the prb
+    % ---------------------------------------------------------------------
+    % 3. Tính lượng RE dành cho Data (PDSCH)
+    % ---------------------------------------------------------------------
+    dmrsRePerPRB = rePerSymbol * numDmrsSymbols;
+    
+    % Tổng số REs của PRB dựa trên Symbol Allocation (thường là 14 * 12 = 168)
     pdschReTotalPerPRB = 12 * pdsch.SymbolAllocation(2);
 
-    % The number of pdsch re available for data in the prb
+    % Số REs còn lại dành cho PDSCH data (N'_RE)
     pdschRePerPRB = pdschReTotalPerPRB - dmrsRePerPRB;
 
-    % The total Re of PDSCH available for data
+    % Ràng buộc tối đa 156 REs / PRB (Theo 3GPP TS 38.214 - 5.1.3.2)
     numRE = min(156, pdschRePerPRB) * length(pdsch.PRBSet);
 
+    % Xác định Qm (Modulation Order)
     switch pdsch.Modulation
         case 'QPSK',    Qm = 2;
         case '16QAM',   Qm = 4;
@@ -26,8 +44,12 @@ function TBS = manualCalculateTBS(pdsch)
         otherwise,      Qm = 2;
     end
 
+    % Tính N_info theo công thức
     NInfo = numRE * pdsch.TargetCodeRate * Qm * pdsch.NumLayers;
 
+    % ---------------------------------------------------------------------
+    % 4. Tra bảng và tính TBS (Giữ nguyên logic chuẩn của bạn)
+    % ---------------------------------------------------------------------
     if NInfo <= 3824
         n = max(3, floor(log2(NInfo)) - 6);
         NInfoPrime = max(24, (2^n) * floor(NInfo / (2^n)));
@@ -41,11 +63,9 @@ function TBS = manualCalculateTBS(pdsch)
                 2600, 2664, 2728, 2792, 2856, 2976, 3104, 3240, 3368, 3496, ...
                 3624, 3752, 3824];
         validTBS = tableTBS(tableTBS >= NInfoPrime);
-
         TBS = validTBS(1);
     else
         n = floor(log2(NInfo - 24)) - 5;
-
         round_val = floor((NInfo - 24) / (2^n) + 0.5);
         NInfoPrime = max(3840, (2^n) * round_val);
 
