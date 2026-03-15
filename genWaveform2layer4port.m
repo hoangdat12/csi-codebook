@@ -87,7 +87,7 @@ ALL_Case = [
 % Configuration Parameters
 % -----------------------------------------------------------------
 SUBBAND_AMPLITUDE = true;
-N1 = 4; N2 = 1; O1 = 4; O2 = 1;
+N1 = 2; N2 = 1; O1 = 4; O2 = 1;
 NUMBER_OF_BEAMS = 2;
 PHASE_ALPHABET_SIZE = 4;
 
