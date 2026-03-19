@@ -68,7 +68,7 @@ function W = generateTypeISinglePanelPrecoder(cfg, nLayers, i1, i2)
 
     switch nLayers
         case 1
-            v_lm = computeBeam(l, m, N1, N2, O1, O2, 2)
+            v_lm = computeBeam(l, m, N1, N2, O1, O2, 2);
 
             W = (1/sqrt(nPorts)) * [v_lm; ...
                                     phi_n * v_lm];
@@ -88,7 +88,7 @@ function W = generateTypeISinglePanelPrecoder(cfg, nLayers, i1, i2)
                 W = (1/sqrt(3*nPorts)) * [v_lm,       v_lm_p,       v_lm; ...
                                           phi_n*v_lm, phi_n*v_lm_p, -phi_n*v_lm];
             else
-                v_lm   = computeBeam(l, m, N1/2, N2, O1, O2, 4); 
+                v_lm   = computeBeam(l, m, N1/2, N2, O1, O2, 2); 
                 
                 W = (1/sqrt(3*nPorts)) * [v_lm,                 v_lm,                   v_lm; ...
                                           theta_p*v_lm,         -theta_p*v_lm,          theta_p*v_lm; ...
@@ -102,7 +102,7 @@ function W = generateTypeISinglePanelPrecoder(cfg, nLayers, i1, i2)
                 v_lm_p = computeBeam(lp, mp, N1, N2, O1, O2, 2);
 
                 W = (1/sqrt(4*nPorts)) * [v_lm,       v_lm_p,       v_lm        , v_lm_p; ...
-                                          phi_n*v_lm, phi_n*v_lm_p, -phi_n*v_lm,  -phi_n*v_lm];
+                                          phi_n*v_lm, phi_n*v_lm_p, -phi_n*v_lm,  -phi_n*v_lm_p];
             else
                 v_lm   = computeBeam(l, m, N1/2, N2, O1, O2, 4); 
 
@@ -141,8 +141,8 @@ function W = generateTypeISinglePanelPrecoder(cfg, nLayers, i1, i2)
             v_lm_pp = computeBeam(lpp, mpp, N1, N2, O1, O2, 2);
             v_lm_ppp = computeBeam(lppp, mppp, N1, N2, O1, O2, 2);
 
-            W = (1/sqrt(8*nPorts)) * [v_lm,       v_lm,         v_lm_p,         v_lm_pp,        v_lm_pp,      v_lm_ppp,     v_lm_ppp; ...
-                                      phi_n*v_lm, -phi_n*v_lm,  phi_n*v_lm_p,   v_lm_pp,        -v_lm_pp,     v_lm_ppp,     -v_lm_ppp];
+            W = (1/sqrt(8*nPorts)) * [v_lm,       v_lm,         v_lm_p,         v_lm_p       v_lm_pp,        v_lm_pp,      v_lm_ppp,     v_lm_ppp; ...
+                                      phi_n*v_lm, -phi_n*v_lm,  phi_n*v_lm_p,   -phi_n*v_lm_p  v_lm_pp,        -v_lm_pp,     v_lm_ppp,     -v_lm_ppp];
     end
 end
 

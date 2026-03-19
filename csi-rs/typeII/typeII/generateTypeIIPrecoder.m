@@ -276,8 +276,6 @@ function [i11, i12, i13, i14, i21, i22] = computeInputs(L, i1_cell, i2_cell, sub
     end
 end
 
-
-
 % i22l = [0, 1, 1, 0, 1, 1, 0, 1];
 % Kli1 = [4, 6, 7, 5, 0, 2, 3, 1], Ml = 7, K2 = 6, Cli = [1, 3, 0, 2, 0, 0, 1, 2], Npsk = 8;
 function phi = computePhi(i14, i21, L, NPsk)

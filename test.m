@@ -3,15 +3,25 @@ clear; clc; close all;
 setupPath();
 
 ALL_Case = [
-    % Case 1: Default
-    struct('desc', 'Case 1: Default', ...
+
+    struct('desc', 'Case: Reference Comparison', ...
            'NLAYERS', 1, 'MCS', 12, ...
            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
-           'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 0, ...
+           'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 1, ... % Code ref total=2 -> AddPos=1
            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
-           'FILE_NAME', 'PDSCH_Waveform_4P1V_DEFAULT');
+           'FILE_NAME', 'PDSCH_Waveform_4P1V_Reference_Compare_TypeI'),
+
+    % % Case 1: Default
+    % struct('desc', 'Case 1: Default', ...
+    %        'NLAYERS', 1, 'MCS', 12, ...
+    %        'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
+    %        'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
+    %        'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
+    %        'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 0, ...
+    %        'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
+    %        'FILE_NAME', 'PDSCH_Waveform_4P1V_DEFAULT');
            
 %     % Case 2: Increase Modulation Type - 256QAM
 %     struct('desc', 'Case 2: Increase Modulation Type - 256QAM', ...
@@ -86,44 +96,7 @@ ALL_Case = [
 % -----------------------------------------------------------------
 % Configuration Parameters
 % -----------------------------------------------------------------
-SUBBAND_AMPLITUDE = true;
-N1 = 2; N2 = 1; O1 = 4; O2 = 1;
-NUMBER_OF_BEAMS = 2;
-PHASE_ALPHABET_SIZE = 4;
-
-% Currently support 2 or 4 beams
-if NUMBER_OF_BEAMS == 2
-    i11 = [1 0];
-    i12 = 3;
-    i13 = 0;
-    i14 = [7,4,2,1];
-
-    i21 = [0,0,0,1];
-    i22 = [1,1,1,1];
-else
-    i11 = [1 1];
-    i12 = 3;
-    i13 = 0;
-    i14 = [7,4,2,1,3,0,2,6];
-
-    i21 = [0,0,2,1,0,3,1,0];
-    i22 = [1,1,1,1,1,1,1,1];
-end
-
 for caseIdx = 1:length(ALL_Case)
-    % -----------------------------------------------------------------
-    % Codebook Configuration
-    % -----------------------------------------------------------------
-    cfg = struct();
-    cfg.N1 = N1;
-    cfg.N2 = N2;
-    cfg.O1 = O1;
-    cfg.O2 = O2;
-    cfg.NumberOfBeams = NUMBER_OF_BEAMS;      
-    cfg.PhaseAlphabetSize = PHASE_ALPHABET_SIZE; 
-    cfg.SubbandAmplitude = SUBBAND_AMPLITUDE;
-    cfg.numLayers = ALL_Case(caseIdx).NLAYERS;   
-
     % -----------------------------------------------------------------
     % Carrier Configuration
     % -----------------------------------------------------------------
@@ -142,8 +115,6 @@ for caseIdx = 1:length(ALL_Case)
     % -----------------------------------------------------------------
     pdsch = customPDSCHConfig(); 
 
-    pdsch.CodebookConfig = cfg;
-    
     pdsch.DMRS.DMRSConfigurationType     = ALL_Case(caseIdx).DMRS_CONFIGURATION_TYPE; 
     pdsch.DMRS.DMRSTypeAPosition         = ALL_Case(caseIdx).DMRS_TYPEA_POSITION; 
     pdsch.DMRS.NumCDMGroupsWithoutData   = ALL_Case(caseIdx).DMRS_NUMCDMGROUP_WITHOUT_DATA;
@@ -161,9 +132,6 @@ for caseIdx = 1:length(ALL_Case)
     % In this code using TABLE 2
     pdsch = pdsch.setMCS(ALL_Case(caseIdx).MCS);
 
-    pdsch.Indices.i1 = {i11, i12, i13, i14};
-    pdsch.Indices.i2 = {i21, i22};
-
     % -----------------------------------------------------------------
     % Generate Bits
     % -----------------------------------------------------------------
@@ -175,7 +143,7 @@ for caseIdx = 1:length(ALL_Case)
     % Manual
     TBS = manualCalculateTBS(pdsch);
 
-    inputBits = randi([0 1], TBS, 1);
+    inputBits = ones(TBS, 1);
 
     % -----------------------------------------------------------------
     % PDSCH Modulation
@@ -193,7 +161,7 @@ for caseIdx = 1:length(ALL_Case)
     testConfig.CodebookConfig.numLayers = 1; % nLayers
     testConfig.CodebookConfig.codebookMode = 1;
 
-    W = getPrecodingMatrixByPMISinglePannel(testConfig, pdsch.NumLayers, 30)
+    W = getPrecodingMatrixByPMISinglePannel(testConfig, pdsch.NumLayers, 30);
     % W = generateTypeIIPrecoder(pdsch, pdsch.Indices.i1, pdsch.Indices.i2, true);    
 
     W_transposed = W.';
@@ -214,9 +182,9 @@ for caseIdx = 1:length(ALL_Case)
     [dmrsAntSym, dmrsAntInd] = nrPDSCHPrecode(carrier, dmrsSym, dmrsInd, W_transposed);
 
     % Frame Grid
-    frameGrid = ResourceGrid(carrier, 2 * cfg.N1 * cfg.N2);
+    frameGrid = ResourceGrid(carrier, 4);
     % Slot grid
-    txGrid = SlotGrid(carrier, 2 * cfg.N1 * cfg.N2); 
+    txGrid = SlotGrid(carrier, 4); 
 
     % Mapping on slot 0
     txGrid(antind) = antsym;
@@ -235,7 +203,7 @@ for caseIdx = 1:length(ALL_Case)
     numRe = size(frameGrid, 1); % Tổng số subcarriers mang dữ liệu (Ví dụ: 273*12 = 3276)
     numSymb = size(frameGrid, 2); % Tổng số symbol trong frameGrid
 
-    numTxPorts = 2 * N1 * N2;
+    numTxPorts = 4;
 
        txDataF_Port1 = [frameGrid(numRe/2+1:end, :, 1); ...
                     zeros(NFFT - numRe, numSymb); ...
