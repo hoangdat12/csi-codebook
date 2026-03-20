@@ -86,44 +86,7 @@ ALL_Case = [
 % -----------------------------------------------------------------
 % Configuration Parameters
 % -----------------------------------------------------------------
-SUBBAND_AMPLITUDE = true;
-N1 = 2; N2 = 1; O1 = 4; O2 = 1;
-NUMBER_OF_BEAMS = 2;
-PHASE_ALPHABET_SIZE = 4;
-
-% Currently support 2 or 4 beams
-if NUMBER_OF_BEAMS == 2
-    i11 = [1 0];
-    i12 = 3;
-    i13 = 0;
-    i14 = [7,4,2,1];
-
-    i21 = [0,0,0,1];
-    i22 = [1,1,1,1];
-else
-    i11 = [1 1];
-    i12 = 3;
-    i13 = 0;
-    i14 = [7,4,2,1,3,0,2,6];
-
-    i21 = [0,0,2,1,0,3,1,0];
-    i22 = [1,1,1,1,1,1,1,1];
-end
-
 for caseIdx = 1:length(ALL_Case)
-    % -----------------------------------------------------------------
-    % Codebook Configuration
-    % -----------------------------------------------------------------
-    cfg = struct();
-    cfg.N1 = N1;
-    cfg.N2 = N2;
-    cfg.O1 = O1;
-    cfg.O2 = O2;
-    cfg.NumberOfBeams = NUMBER_OF_BEAMS;      
-    cfg.PhaseAlphabetSize = PHASE_ALPHABET_SIZE; 
-    cfg.SubbandAmplitude = SUBBAND_AMPLITUDE;
-    cfg.numLayers = ALL_Case(caseIdx).NLAYERS;   
-
     % -----------------------------------------------------------------
     % Carrier Configuration
     % -----------------------------------------------------------------
@@ -142,8 +105,6 @@ for caseIdx = 1:length(ALL_Case)
     % -----------------------------------------------------------------
     pdsch = customPDSCHConfig(); 
 
-    pdsch.CodebookConfig = cfg;
-    
     pdsch.DMRS.DMRSConfigurationType     = ALL_Case(caseIdx).DMRS_CONFIGURATION_TYPE; 
     pdsch.DMRS.DMRSTypeAPosition         = ALL_Case(caseIdx).DMRS_TYPEA_POSITION; 
     pdsch.DMRS.NumCDMGroupsWithoutData   = ALL_Case(caseIdx).DMRS_NUMCDMGROUP_WITHOUT_DATA;
@@ -161,18 +122,9 @@ for caseIdx = 1:length(ALL_Case)
     % In this code using TABLE 2
     pdsch = pdsch.setMCS(ALL_Case(caseIdx).MCS);
 
-    pdsch.Indices.i1 = {i11, i12, i13, i14};
-    pdsch.Indices.i2 = {i21, i22};
-
     % -----------------------------------------------------------------
     % Generate Bits
     % -----------------------------------------------------------------
-    [~, pdschInfo] = nrPDSCHIndices(carrier, pdsch);
-    NREPerPRB = pdschInfo.NREPerPRB;
-
-    % TBS = nrTBS(pdsch.Modulation, pdsch.NumLayers, ...
-    %             length(pdsch.PRBSet), NREPerPRB, pdsch.TargetCodeRate);
-    % Manual
     TBS = manualCalculateTBS(pdsch);
 
     inputBits = ones(TBS, 1);
@@ -182,46 +134,21 @@ for caseIdx = 1:length(ALL_Case)
     % -----------------------------------------------------------------
     [layerMappedSym, pdschInd] = myPDSCHEncode(pdsch, carrier, inputBits);
 
-    testConfig = struct();
-    testConfig.CodebookConfig.N1 = 2;
-    testConfig.CodebookConfig.N2 = 1;
-    testConfig.CodebookConfig.O1 = 4;
-    testConfig.CodebookConfig.O2 = 1;
-    testConfig.CodebookConfig.NumberOfBeams = 2;     % L
-    testConfig.CodebookConfig.PhaseAlphabetSize = 4; % NPSK
-    testConfig.CodebookConfig.SubbandAmplitude = true;
-    testConfig.CodebookConfig.numLayers = 1; % nLayers
-    testConfig.CodebookConfig.codebookMode = 1;
-
-    % W = getPrecodingMatrixByPMISinglePannel(testConfig, pdsch.NumLayers, 30);
-    % W = generateTypeIIPrecoder(pdsch, pdsch.Indices.i1, pdsch.Indices.i2, true); 
-    W = [0.25; 0.25; 0.25; 0.25];
-
-    W_transposed = W.';
-    [antsym, antind] = nrPDSCHPrecode(carrier, layerMappedSym, pdschInd, W_transposed);
-
-    dataPrecoded = layerMappedSym * W_transposed;
-
-    % diff = abs(antsym - dataPrecoded);
-    % disp(max(diff)); 
-
     dmrsSym = genDMRS(carrier, pdsch);
     dmrsInd = DMRSIndices(pdsch, carrier);
 
-    [dmrsAntSym, dmrsAntInd] = nrPDSCHPrecode(carrier, dmrsSym, dmrsInd, W_transposed);
-    dmrsPredecoded = dmrsSym * W_transposed;
+    W = [0.25; 0.25; 0.25; 0.25];
 
-    % Frame Grid
-    frameGrid = ResourceGrid(carrier, 2 * cfg.N1 * cfg.N2);
-    % Slot grid
-    txGrid = SlotGrid(carrier, 2 * cfg.N1 * cfg.N2); 
+    % Kich thuoc Frame Grid la So RE x  so Symbols x So Port = 3276 x 280 x 4
+    frameGrid = ResourceGrid(carrier, 4);
+
+    txGrid = SlotGrid(carrier, 4); 
 
     % Mapping on slot 0
-    txGrid(antind) = dataPrecoded;
-    txGrid(dmrsAntInd) = dmrsPredecoded;  
-
-    % txGrid(antind) = antsym;
-    % txGrid(dmrsAntInd) = dmrsAntSym;  
+    txGrid(pdschInd) = layerMappedSym;
+    txGrid(dmrsInd) = dmrsSym; 
+    
+    txGridAntennas = precoding(txGrid, W);
 
     symbolsPerSlot = carrier.SymbolsPerSlot;
     currentSlotIdx = carrier.NSlot; 
@@ -230,36 +157,60 @@ for caseIdx = 1:length(ALL_Case)
     endSym = (currentSlotIdx + 1) * symbolsPerSlot;
 
     % Extended to all Frame
-    frameGrid(:, startSym:endSym, :) = txGrid;
+    frameGrid(:, startSym:endSym, :) = txGridAntennas;
+
+    % W_transposed = W.';
+    % [dmrsAntSym, dmrsAntInd] = nrPDSCHPrecode(carrier, dmrsSym, dmrsInd, W_transposed);
+    % [antsym, antind] = nrPDSCHPrecode(carrier, layerMappedSym, pdschInd, W_transposed);
+
+    % frameGridRef = ResourceGrid(carrier, 4);
+
+    % txGridRef = SlotGrid(carrier, 4); 
+
+    % % Mapping on slot 0
+    % txGridRef(antind) = antsym;
+    % txGridRef(dmrsAntInd) = dmrsAntSym; 
+    
+    % symbolsPerSlot = carrier.SymbolsPerSlot;
+    % currentSlotIdx = carrier.NSlot; 
+
+    % startSym = currentSlotIdx * symbolsPerSlot + 1;
+    % endSym = (currentSlotIdx + 1) * symbolsPerSlot;
+
+    % % Extended to all Frame
+    % frameGridRef(:, startSym:endSym, :) = txGridRef;
+
+    % fprintf('Max diff: %.6e\n', max(abs(frameGrid(:) - frameGridRef(:))));
+    % fprintf('Identical: %d\n',  isequal(frameGrid, frameGridRef));
 
     NFFT = 4096; % Kích thước IFFT
     numRe = size(frameGrid, 1); % Tổng số subcarriers mang dữ liệu (Ví dụ: 273*12 = 3276)
     numSymb = size(frameGrid, 2); % Tổng số symbol trong frameGrid
 
-    numTxPorts = 2 * N1 * N2;
+    numTxPorts = 4;
 
-       txDataF_Port1 = [frameGrid(numRe/2+1:end, :, 1); ...
+    txDataF_Port1 = [frameGrid(numRe/2+1:end, :, 1); ...
                     zeros(NFFT - numRe, numSymb); ...
                     frameGrid(1:numRe/2, :, 1)];
 
-       txDataF_Port2 = [frameGrid(numRe/2+1:end, :, 2); ...
+    txDataF_Port2 = [frameGrid(numRe/2+1:end, :, 2); ...
                     zeros(NFFT - numRe, numSymb); ...
                     frameGrid(1:numRe/2, :, 2)];
                     
-       txDataF_Port3 = [frameGrid(numRe/2+1:end, :, 3); ...
+    txDataF_Port3 = [frameGrid(numRe/2+1:end, :, 3); ...
                     zeros(NFFT - numRe, numSymb); ...
                     frameGrid(1:numRe/2, :, 3)];
                     
-       txDataF_Port4 = [frameGrid(numRe/2+1:end, :, 4); ...
+    txDataF_Port4 = [frameGrid(numRe/2+1:end, :, 4); ...
                     zeros(NFFT - numRe, numSymb); ...
                     frameGrid(1:numRe/2, :, 4)];       
 
-       temp_txdata1 = ofdmModulation(txDataF_Port1, NFFT);
-       temp_txdata2 = ofdmModulation(txDataF_Port2, NFFT);
-       temp_txdata3 = ofdmModulation(txDataF_Port3, NFFT);
-       temp_txdata4 = ofdmModulation(txDataF_Port4, NFFT);
+    temp_txdata1 = ofdmModulation(txDataF_Port1, NFFT);
+    temp_txdata2 = ofdmModulation(txDataF_Port2, NFFT);
+    temp_txdata3 = ofdmModulation(txDataF_Port3, NFFT);
+    temp_txdata4 = ofdmModulation(txDataF_Port4, NFFT);
 
-       txdata1 = [temp_txdata1, temp_txdata2, temp_txdata3, temp_txdata4];
+    txdata1 = [temp_txdata1, temp_txdata2, temp_txdata3, temp_txdata4];
 
     centerFreq = 0;
     nchannel = numTxPorts; 
@@ -267,4 +218,26 @@ for caseIdx = 1:length(ALL_Case)
     scs = 30000; % SCS 30kHz
     data_repeat = repmat(txdata1, nFrame, 1); 
     savevsarecordingmulti(ALL_Case(caseIdx).FILE_NAME, data_repeat, NFFT*scs, centerFreq, nchannel);
+end
+
+function precodedGrid = precoding(txGrid, W)
+    % K = 3276 L = 14 (1 slot)
+    [K, L, ~] = size(txGrid);
+    
+    % 4 Port 1 Layer
+    [nPorts, nLayers] = size(W);
+    
+    % Lay data cho dung so luong layers. va cac nPort - nLayers khac thi toan 0
+    layersIn = txGrid(:, :, 1:nLayers);
+    
+    % Flatten grid từ (K × L × nLayers) → (K*L × nLayers)
+    % Mỗi hàng là 1 RE (resource element)
+    layersFlat = reshape(layersIn, K*L, nLayers);
+    
+    % Với mỗi RE: vector layer (1 × nLayers) nhân với W^T (nLayers × nPorts)
+    % → kết quả (1 × nPorts)
+    precodedFlat = layersFlat * (W.');
+    
+    % Reshape lại về dạng grid
+    precodedGrid = reshape(precodedFlat, K, L, nPorts);
 end
