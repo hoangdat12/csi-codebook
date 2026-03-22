@@ -1,43 +1,47 @@
 % -----------------------------------------------------------------
 % This function calculates the MMSE Precoding Matrix
-% It return:
+% It returns:
 %   - W_mmse_transposed: The transposed precoding matrix
 % -----------------------------------------------------------------
-function W_mmse_transposed = getMMSEPrecoder(H_est, SNR_dB, numTx)
+function W_mmse_transposed = getMMSEPrecoder(H_est, SNR_dB, ~) 
+    % Bỏ numTx ở đầu vào (dùng dấu ~) vì ta không dùng nó để tính alpha nữa
 
     % -----------------------------------------------------------------
     % SNR & REGULARIZATION
     % -----------------------------------------------------------------
-    % Convert SNR from dB to linear scale
+    % Chuyển SNR từ dB sang linear scale
     SNR_linear = 10^(SNR_dB/10);
 
-    % Calculate regularization factor alpha
-    % Usually defined as NumTx / SNR_linear for MMSE
-    alpha = numTx / SNR_linear; 
+    % Lấy số lượng luồng/UE (K)
+    K = size(H_est, 1); 
+
+    % SỬA LỖI 1: Tính alpha dựa trên số lượng UE (K) thay vì số lượng Anten phát
+    alpha = K / SNR_linear; 
     
     % -----------------------------------------------------------------
     % MMSE MATRIX CALCULATION
     % -----------------------------------------------------------------
-    % Hermitian transpose (Conjugate Transpose) of Channel Matrix
     H_conj = H_est';
 
-    % Calculate term: (H * H') + (alpha * I)
-    term = (H_est * H_conj) + (alpha * eye(size(H_est, 1)));
+    % Tính: (H * H') + (alpha * I)
+    term = (H_est * H_conj) + (alpha * eye(K));
     
-    % Compute unnormalized precoder P = H' * inv(term)
-    % Using Matrix Right Division (/) is numerically more stable than inv()
+    % Tính Precoder P (Kích thước: NumTx x K)
     P = H_conj / term; 
     
     % -----------------------------------------------------------------
-    % POWER NORMALIZATION
+    % POWER NORMALIZATION (SỬA LỖI 2)
     % -----------------------------------------------------------------
-    % Calculate scaling factor to ensure total power constraint
-    scale = sqrt(size(H_est, 1) / trace(P * P'));
-    P = P * scale; 
+    % Thay vì chuẩn hóa tổng, ta chuẩn hóa từng cột của P 
+    % để đảm bảo mỗi UE/luồng nhận được mức công suất phát đều nhau (1 đơn vị)
+    for k = 1:K
+        norm_factor = norm(P(:, k));
+        P(:, k) = P(:, k) / norm_factor;
+    end
     
     % -----------------------------------------------------------------
     % OUTPUT
     % -----------------------------------------------------------------
-    % Return the non-conjugate transpose of the precoder
+    % Trả về ma trận chuyển vị (không liên hợp) để khớp với code của bạn
     W_mmse_transposed = P.'; 
 end

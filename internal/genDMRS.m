@@ -41,6 +41,20 @@ function dmrs_values = genDMRS(carrier, pdsch, enabledR16)
     fmaskAllPorts = pdsch.DMRS.FrequencyWeights;
     tmaskAllPorts = pdsch.DMRS.TimeWeights;
     
+    % scale_factor = sqrt(pdsch.DMRS.NumCDMGroupsWithoutData);
+    CDM_without_data = pdsch.DMRS.NumCDMGroupsWithoutData;
+    switch CDM_without_data
+        case 1
+            beta_dmrs = 0;
+        case 2
+            beta_dmrs = -3;
+        case 3
+            beta_dmrs = -4.77;
+        otherwise
+            beta_dmrs = 0;
+    end
+    scale_factor = 10^(-beta_dmrs/20);
+
     for i = 1:length(dmrssymbols)
         c_init = c_init_list(i);
         
@@ -83,7 +97,7 @@ function dmrs_values = genDMRS(carrier, pdsch, enabledR16)
             wf_pattern = repmat(wf, numSubcarriersPerSymbol / length(wf), 1);
             
             % Multiply base sequence by OCC and store in respective layer column
-            dmrs_values(startIndex:endIndex, layerIdx) = complex_symbol_vector .* wf_pattern .* wt;
+            dmrs_values(startIndex:endIndex, layerIdx) = complex_symbol_vector .* wf_pattern .* wt .* scale_factor;
         end
     end
 end

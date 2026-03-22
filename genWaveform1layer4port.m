@@ -5,110 +5,34 @@ setupPath();
 ALL_Case = [
     % Case 1: Default
     struct('desc', 'Case 1: Default', ...
-           'NLAYERS', 1, 'MCS', 12, ...
+           'NLAYERS', 2, 'MCS', 12, ...
            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
            'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 1, ...
            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
            'FILE_NAME', 'PDSCH_Waveform_4P1V_Matran025');
-           
-%     % Case 2: Increase Modulation Type - 256QAM
-%     struct('desc', 'Case 2: Increase Modulation Type - 256QAM', ...
-%            'NLAYERS', 1, 'MCS', 22, ... % <--- Thay đổi MCS = 22
-%            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
-%            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
-%            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
-%            'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 0, ...
-%            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
-%            'FILE_NAME', 'PDSCH_Waveform_4P1V_256QAM');
+];
 
-%     % Case 3: Change PDSCH Allocation - 0:136
-%     struct('desc', 'Case 3: Change PDSCH Allocation - 0:136', ...
-%            'NLAYERS', 1, 'MCS', 12, ...
-%            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
-%            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
-%            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
-%            'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 0, ...
-%            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:136, 'PDSCH_START_SYMBOL', 0, ... % <--- Thay đổi PRBSET
-%            'FILE_NAME', 'PDSCH_Waveform_4P1V_HALF_Bandwidth'); 
 
-%     % Case 4: Change Slot Index - 5
-%     struct('desc', 'Case 4: Change Slot Index - 5', ...
-%            'NLAYERS', 1, 'MCS', 12, ...
-%            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
-%            'NSLOT', 5, 'NFRAME', 0, 'NCELL_ID', 20, ... % <--- Thay đổi NSLOT = 5
-%            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
-%            'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 0, ...
-%            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
-%            'FILE_NAME', 'PDSCH_Waveform_4P1V_Slot_Index_5'); 
-
-%     % Case 5: Change PDSCH Start Symbol - 2
-%     struct('desc', 'Case 5: Change PDSCH Start Symbol - 2', ...
-%            'NLAYERS', 1, 'MCS', 12, ...
-%            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
-%            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
-%            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
-%            'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 0, ...
-%            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 2, ... % <--- Thay đổi Start Symbol = 2
-%            'FILE_NAME', 'PDSCH_Waveform_4P1V_PDSCH_Start_Sym2'); 
-%     % Case 6: DMRS Length 2 
-%     struct('desc', 'Case 6: DMRS Length 2', ...
-%            'NLAYERS', 1, 'MCS', 12, ...
-%            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
-%            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
-%            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
-%            'DMRS_LENGTH', 2, 'DMRS_ADDITIONAL_POSITION', 0, ... % <--- Thay đổi DMRS Length = 2
-%            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
-%            'FILE_NAME', 'PDSCH_Waveform_4P1V_DMRS_LENGTH_2'); 
-
-%     % Case 7: DMRS additional position 1
-%     struct('desc', 'Case 7: DMRS additional position 1', ...
-%            'NLAYERS', 1, 'MCS', 12, ...
-%            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
-%            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
-%            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
-%            'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 1, ... % <--- Thay đổi DMRS Additional Pos = 1
-%            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
-%            'FILE_NAME', 'PDSCH_Waveform_4P1V_DMRS_ADD_Position_1'); 
-
-%     % Case 8: DMRS Type 2
-%     struct('desc', 'Case 8: DMRS Type 2', ...
-%            'NLAYERS', 1, 'MCS', 12, ...
-%            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
-%            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
-%            'DMRS_CONFIGURATION_TYPE', 2, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ... % <--- Thay đổi DMRS Config Type = 2
-%            'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 0, ...
-%            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
-%            'FILE_NAME', 'PDSCH_Waveform_4P1V_DMRS_TYPE_2'); 
-];    
-
-% -----------------------------------------------------------------
-% Configuration Parameters
-% -----------------------------------------------------------------
 SUBBAND_AMPLITUDE = true;
-N1 = 2; N2 = 1; O1 = 4; O2 = 1;
+N1 = 4; N2 = 1; O1 = 4; O2 = 1;
 NUMBER_OF_BEAMS = 2;
 PHASE_ALPHABET_SIZE = 4;
 
-% Currently support 2 or 4 beams
-if NUMBER_OF_BEAMS == 2
-    i11 = [1 0];
-    i12 = 3;
-    i13 = 0;
-    i14 = [7,4,2,1];
+i11 = [1 0];
+i12 = 2;
 
-    i21 = [0,0,0,1];
-    i22 = [1,1,1,1];
-else
-    i11 = [1 1];
-    i12 = 3;
-    i13 = 0;
-    i14 = [7,4,2,1,3,0,2,6];
+i13 = [3; 2];
 
-    i21 = [0,0,2,1,0,3,1,0];
-    i22 = [1,1,1,1,1,1,1,1];
-end
+i14 = [2 7 0 3;
+       6 1 3 3];
+
+i21 = [1 3 0 0;
+       2 2 0 0];
+
+i22 = [1 1 1 1;
+       1 1 1 1];
 
 for caseIdx = 1:length(ALL_Case)
     % -----------------------------------------------------------------
@@ -181,47 +105,19 @@ for caseIdx = 1:length(ALL_Case)
     % PDSCH Modulation
     % -----------------------------------------------------------------
     [layerMappedSym, pdschInd] = myPDSCHEncode(pdsch, carrier, inputBits);
-
-    testConfig = struct();
-    testConfig.CodebookConfig.N1 = 2;
-    testConfig.CodebookConfig.N2 = 1;
-    testConfig.CodebookConfig.O1 = 4;
-    testConfig.CodebookConfig.O2 = 1;
-    testConfig.CodebookConfig.NumberOfBeams = 2;     % L
-    testConfig.CodebookConfig.PhaseAlphabetSize = 4; % NPSK
-    testConfig.CodebookConfig.SubbandAmplitude = true;
-    testConfig.CodebookConfig.numLayers = 1; % nLayers
-    testConfig.CodebookConfig.codebookMode = 1;
-
-    % W = getPrecodingMatrixByPMISinglePannel(testConfig, pdsch.NumLayers, 30);
-    % W = generateTypeIIPrecoder(pdsch, pdsch.Indices.i1, pdsch.Indices.i2, true); 
-    W = [0.25; 0.25; 0.25; 0.25];
-
-    W_transposed = W.';
-    [antsym, antind] = nrPDSCHPrecode(carrier, layerMappedSym, pdschInd, W_transposed);
-
-    dataPrecoded = layerMappedSym * W_transposed;
-
-    % diff = abs(antsym - dataPrecoded);
-    % disp(max(diff)); 
-
     dmrsSym = genDMRS(carrier, pdsch);
     dmrsInd = DMRSIndices(pdsch, carrier);
+    
+    W = generateTypeIIPrecoder(pdsch, pdsch.Indices.i1, pdsch.Indices.i2, true)
 
-    [dmrsAntSym, dmrsAntInd] = nrPDSCHPrecode(carrier, dmrsSym, dmrsInd, W_transposed);
-    dmrsPredecoded = dmrsSym * W_transposed;
+    frameGrid = ResourceGrid(carrier, 2 * N1 * N2);
 
-    % Frame Grid
-    frameGrid = ResourceGrid(carrier, 2 * cfg.N1 * cfg.N2);
-    % Slot grid
-    txGrid = SlotGrid(carrier, 2 * cfg.N1 * cfg.N2); 
+    txGrid = SlotGrid(carrier, 2 * N1 * N2); 
 
-    % Mapping on slot 0
-    txGrid(antind) = dataPrecoded;
-    txGrid(dmrsAntInd) = dmrsPredecoded;  
-
-    % txGrid(antind) = antsym;
-    % txGrid(dmrsAntInd) = dmrsAntSym;  
+    txGrid(pdschInd) = layerMappedSym;
+    txGrid(dmrsInd) = dmrsSym; 
+    
+    txGridAntennas = precoding(txGrid, W);
 
     symbolsPerSlot = carrier.SymbolsPerSlot;
     currentSlotIdx = carrier.NSlot; 
@@ -229,8 +125,7 @@ for caseIdx = 1:length(ALL_Case)
     startSym = currentSlotIdx * symbolsPerSlot + 1;
     endSym = (currentSlotIdx + 1) * symbolsPerSlot;
 
-    % Extended to all Frame
-    frameGrid(:, startSym:endSym, :) = txGrid;
+    frameGrid(:, startSym:endSym, :) = txGridAntennas;
 
     NFFT = 4096; % Kích thước IFFT
     numRe = size(frameGrid, 1); % Tổng số subcarriers mang dữ liệu (Ví dụ: 273*12 = 3276)
@@ -238,28 +133,14 @@ for caseIdx = 1:length(ALL_Case)
 
     numTxPorts = 2 * N1 * N2;
 
-       txDataF_Port1 = [frameGrid(numRe/2+1:end, :, 1); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGrid(1:numRe/2, :, 1)];
+    txdata1 = zeros(size(ofdmModulation([frameGrid(numRe/2+1:end, :, 1); zeros(NFFT - numRe, numSymb); frameGrid(1:numRe/2, :, 1)], NFFT), 1), numTxPorts);
 
-       txDataF_Port2 = [frameGrid(numRe/2+1:end, :, 2); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGrid(1:numRe/2, :, 2)];
-                    
-       txDataF_Port3 = [frameGrid(numRe/2+1:end, :, 3); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGrid(1:numRe/2, :, 3)];
-                    
-       txDataF_Port4 = [frameGrid(numRe/2+1:end, :, 4); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGrid(1:numRe/2, :, 4)];       
-
-       temp_txdata1 = ofdmModulation(txDataF_Port1, NFFT);
-       temp_txdata2 = ofdmModulation(txDataF_Port2, NFFT);
-       temp_txdata3 = ofdmModulation(txDataF_Port3, NFFT);
-       temp_txdata4 = ofdmModulation(txDataF_Port4, NFFT);
-
-       txdata1 = [temp_txdata1, temp_txdata2, temp_txdata3, temp_txdata4];
+    for p = 1:numTxPorts
+        txDataF_Port = [frameGrid(numRe/2+1:end, :, p); ...
+                        zeros(NFFT - numRe, numSymb); ...
+                        frameGrid(1:numRe/2, :, p)];
+        txdata1(:, p) = ofdmModulation(txDataF_Port, NFFT);
+    end
 
     centerFreq = 0;
     nchannel = numTxPorts; 
