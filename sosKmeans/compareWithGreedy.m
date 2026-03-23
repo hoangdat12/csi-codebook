@@ -41,7 +41,7 @@ disp('--- Running K-Means to build Representative Pool ---');
 % =========================================================================
 phyConfig = struct();
 phyConfig.MCS               = 4;
-phyConfig.SNR_dB            = 30;
+phyConfig.SNR_dB            = 20;
 phyConfig.PRBSet            = 0:272;
 phyConfig.SubcarrierSpacing = 30;
 phyConfig.NSizeGrid         = 273;
@@ -50,7 +50,7 @@ phyConfig.NSizeGrid         = 273;
 % 5. Run scheduling comparison across group sizes 2 to 12
 % =========================================================================
 maxIter    = 100;
-groupSizes = 2:12;
+groupSizes = 2:16;
 
 final_results = runSchedulingComparison(W_pool, phyConfig, groupSizes, maxIter);
 
@@ -338,7 +338,6 @@ function BER_list = simulateMuMimoGroup(W_pool, bestGroups, config, groupSize)
 
     % =========================================================
     % Select DMRS Type and Length
-    % Port reuse is allowed when total streams exceed 12
     % =========================================================
     if totalPorts <= 4
         pdsch.DMRS.DMRSConfigurationType = 1;
@@ -351,7 +350,7 @@ function BER_list = simulateMuMimoGroup(W_pool, bestGroups, config, groupSize)
         pdsch.DMRS.DMRSConfigurationType = 2;
         pdsch.DMRS.DMRSLength            = 2;
         if totalPorts > 12
-            fprintf('[Note] %d ports requested. DMRS Port Reuse will be applied (5G NR supports max 12 orthogonal ports).\n', totalPorts);
+            fprintf('[Note] %d ports requested. DMRS Port Reuse and Scrambling will be applied.\n', totalPorts);
         end
     end
 
@@ -398,13 +397,16 @@ function BER_list = muMimo(carrier, basePDSCHConfig, UE_W_list, MCS, SNR_dB)
         logicalPortStart = (u-1) * nLayers;
         logicalPorts     = logicalPortStart : logicalPortStart + nLayers - 1;
 
-        % --- APPLY DMRS PORT REUSE ---
+        % --- CẬP NHẬT DMRS PORT REUSE & SCRAMBLING ---
         physicalPorts = mod(logicalPorts, maxPortIndex + 1);
         pd.DMRS.DMRSPortSet = physicalPorts;
         
         % Alternate NSCID to reduce inter-user interference under port reuse
         reuseFactor = floor(logicalPortStart / (maxPortIndex + 1));
         pd.DMRS.NSCID = mod(reuseFactor, 2);
+        
+        % Đảm bảo chuỗi DMRS được xáo trộn khác nhau khi tái sử dụng port
+        pd.DMRS.NIDNSCID = pd.DMRS.NSCID; 
         
         % Configure CDM groups to prevent PDSCH from overlapping DMRS
         if dmrsType == 1
@@ -423,15 +425,24 @@ function BER_list = muMimo(carrier, basePDSCHConfig, UE_W_list, MCS, SNR_dB)
         inputBits_list{u} = randi([0 1], TBS, 1);
     end
 
-    % MMSE Precoding (getMMSEPrecoder takes 2 arguments as updated)
+    % MMSE Precoding
     H_composite = cell2mat(cellfun(@(w) w', UE_W_list(:), 'UniformOutput', false));
     W_total_T   = getMMSEPrecoder(H_composite, SNR_dB);
+
+    % --- CẬP NHẬT CHUẨN HÓA VÀ PHÂN BỔ CÔNG SUẤT (EQUAL POWER ALLOCATION) ---
+    % Chuẩn hóa tổng thể ma trận tiền mã hóa
+    normFactor = norm(W_total_T, 'fro');
+    W_total_T_norm = W_total_T / normFactor;
 
     W_list = cell(numUE, 1);
     for u = 1:numUE
         rowStart  = (u-1)*nLayers + 1;
-        W_list{u} = W_total_T(rowStart : u*nLayers, :);
+        W_ue = W_total_T_norm(rowStart : u*nLayers, :);
+        
+        % Cân bằng năng lượng cho từng UE
+        W_list{u} = W_ue / norm(W_ue, 'fro') * sqrt(1/numUE);
     end
+    % -----------------------------
 
     % Resource mapping and OFDM modulation
     numTxPorts = size(W_list{1}, 2); % Number of transmit antenna ports
@@ -666,517 +677,517 @@ function [bestGroups_Greedy, time_greedy, avg_score_greedy, BER_results] = runGr
         loop_counter = 0;
 
         switch groupSize
-            case 2
-                for i = 1:N_avail-1
-                    if time_out_flag, break; end
-                    idx_a = available_ues(i);
-                    for j = i+1:N_avail
-                        idx_b = available_ues(j);
-                        
-                        % --- KIỂM TRA TIMEOUT ---
-                        loop_counter = loop_counter + 1;
-                        if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
-                            fprintf('[TIMEOUT] Dừng quét nhóm 2 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
-                            time_out_flag = true; break;
-                        end
-                        
-                        avg_score = distMat(idx_a, idx_b);
-                        if avg_score > best_group_score
-                            best_group_score  = avg_score;
-                            best_idx_in_avail = [i, j];
-                            found_any = true;
-                        end
-                    end
-                end
-
-            case 3
-                for i = 1:N_avail-2
-                    if time_out_flag, break; end
-                    idx_a = available_ues(i);
-                    for j = i+1:N_avail-1
-                        if time_out_flag, break; end
-                        idx_b = available_ues(j);
-                        d1 = distMat(idx_a, idx_b);
-                        for k = j+1:N_avail
-                            idx_c = available_ues(k);
-                            
-                            % --- KIỂM TRA TIMEOUT ---
-                            loop_counter = loop_counter + 1;
-                            if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
-                                fprintf('[TIMEOUT] Dừng quét nhóm 3 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
-                                time_out_flag = true; break;
-                            end
-                            
-                            avg_score = (d1 + distMat(idx_a,idx_c) + distMat(idx_b,idx_c)) / 3;
-                            if avg_score > best_group_score
-                                best_group_score  = avg_score;
-                                best_idx_in_avail = [i, j, k];
-                                found_any = true;
-                            end
-                        end
-                    end
-                end
-
-            case 4
-                for i = 1:N_avail-3
-                    if time_out_flag, break; end
-                    idx_a = available_ues(i);
-                    for j = i+1:N_avail-2
-                        if time_out_flag, break; end
-                        idx_b = available_ues(j);
-                        d1 = distMat(idx_a, idx_b);
-                        for k = j+1:N_avail-1
-                            if time_out_flag, break; end
-                            idx_c = available_ues(k);
-                            d2 = distMat(idx_a, idx_c);
-                            d4 = distMat(idx_b, idx_c);
-                            for l = k+1:N_avail
-                                idx_d = available_ues(l);
-                                
-                                % --- KIỂM TRA TIMEOUT ---
-                                loop_counter = loop_counter + 1;
-                                if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
-                                    fprintf('[TIMEOUT] Dừng quét nhóm 4 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
-                                    time_out_flag = true; break;
-                                end
-                                
-                                avg_score = (d1 + d2 + distMat(idx_a,idx_d) + ...
-                                            d4 + distMat(idx_b,idx_d) + distMat(idx_c,idx_d)) / 6;
-                                if avg_score > best_group_score
-                                    best_group_score  = avg_score;
-                                    best_idx_in_avail = [i, j, k, l];
-                                    found_any = true;
-                                end
-                            end
-                        end
-                    end
-                end
-                
-            % =========================================================
-            % CASE 5: 5 VÒNG LẶP LỒNG NHAU (10 CẶP KHOẢNG CÁCH)
-            % =========================================================
-            case 5
-                for i = 1:N_avail-4
-                    if time_out_flag, break; end
-                    idx_a = available_ues(i);
-                    for j = i+1:N_avail-3
-                        if time_out_flag, break; end
-                        idx_b = available_ues(j);
-                        for k = j+1:N_avail-2
-                            if time_out_flag, break; end
-                            idx_c = available_ues(k);
-                            for l = k+1:N_avail-1
-                                if time_out_flag, break; end
-                                idx_d = available_ues(l);
-                                for m = l+1:N_avail
-                                    idx_e = available_ues(m);
-                                    
-                                    % --- KIỂM TRA TIMEOUT ---
-                                    loop_counter = loop_counter + 1;
-                                    if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
-                                        fprintf('[TIMEOUT] Dừng quét nhóm 5 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
-                                        time_out_flag = true; break;
-                                    end
-                                    
-                                    avg_score = (distMat(idx_a,idx_b) + distMat(idx_a,idx_c) + distMat(idx_a,idx_d) + distMat(idx_a,idx_e) + ...
-                                                distMat(idx_b,idx_c) + distMat(idx_b,idx_d) + distMat(idx_b,idx_e) + ...
-                                                distMat(idx_c,idx_d) + distMat(idx_c,idx_e) + ...
-                                                distMat(idx_d,idx_e)) / 10;
-                                                
-                                    if avg_score > best_group_score
-                                        best_group_score  = avg_score;
-                                        best_idx_in_avail = [i, j, k, l, m];
-                                        found_any = true;
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-            % =========================================================
-            % CASE 6: 6 VÒNG LẶP LỒNG NHAU (15 CẶP KHOẢNG CÁCH)
-            % =========================================================
-            case 6
-                for i = 1:N_avail-5
-                    if time_out_flag, break; end
-                    idx_a = available_ues(i);
-                    for j = i+1:N_avail-4
-                        if time_out_flag, break; end
-                        idx_b = available_ues(j);
-                        for k = j+1:N_avail-3
-                            if time_out_flag, break; end
-                            idx_c = available_ues(k);
-                            for l = k+1:N_avail-2
-                                if time_out_flag, break; end
-                                idx_d = available_ues(l);
-                                for m = l+1:N_avail-1
-                                    if time_out_flag, break; end
-                                    idx_e = available_ues(m);
-                                    for n = m+1:N_avail
-                                        idx_f = available_ues(n);
-                                        
-                                        % --- KIỂM TRA TIMEOUT ---
-                                        loop_counter = loop_counter + 1;
-                                        if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
-                                            fprintf('[TIMEOUT] Dừng quét nhóm 6 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
-                                            time_out_flag = true; break;
-                                        end
-                                        
-                                        avg_score = (distMat(idx_a,idx_b) + distMat(idx_a,idx_c) + distMat(idx_a,idx_d) + distMat(idx_a,idx_e) + distMat(idx_a,idx_f) + ...
-                                                    distMat(idx_b,idx_c) + distMat(idx_b,idx_d) + distMat(idx_b,idx_e) + distMat(idx_b,idx_f) + ...
-                                                    distMat(idx_c,idx_d) + distMat(idx_c,idx_e) + distMat(idx_c,idx_f) + ...
-                                                    distMat(idx_d,idx_e) + distMat(idx_d,idx_f) + ...
-                                                    distMat(idx_e,idx_f)) / 15;
-                                                    
-                                        if avg_score > best_group_score
-                                            best_group_score  = avg_score;
-                                            best_idx_in_avail = [i, j, k, l, m, n];
-                                            found_any = true;
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-            % =========================================================
-            % CASE 7: 7 VÒNG LẶP LỒNG NHAU (21 CẶP KHOẢNG CÁCH)
-            % =========================================================
-            case 7
-                for i = 1:N_avail-6
-                    if time_out_flag, break; end
-                    idx_a = available_ues(i);
-                    for j = i+1:N_avail-5
-                        if time_out_flag, break; end
-                        idx_b = available_ues(j);
-                        for k = j+1:N_avail-4
-                            if time_out_flag, break; end
-                            idx_c = available_ues(k);
-                            for l = k+1:N_avail-3
-                                if time_out_flag, break; end
-                                idx_d = available_ues(l);
-                                for m = l+1:N_avail-2
-                                    if time_out_flag, break; end
-                                    idx_e = available_ues(m);
-                                    for n = m+1:N_avail-1
-                                        if time_out_flag, break; end
-                                        idx_f = available_ues(n);
-                                        for o = n+1:N_avail
-                                            idx_g = available_ues(o);
-                                            
-                                            % --- KIỂM TRA TIMEOUT ---
-                                            loop_counter = loop_counter + 1;
-                                            if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
-                                                fprintf('[TIMEOUT] Dừng quét nhóm 7 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
-                                                time_out_flag = true; break;
-                                            end
-                                            
-                                            avg_score = (distMat(idx_a,idx_b) + distMat(idx_a,idx_c) + distMat(idx_a,idx_d) + distMat(idx_a,idx_e) + distMat(idx_a,idx_f) + distMat(idx_a,idx_g) + ...
-                                                        distMat(idx_b,idx_c) + distMat(idx_b,idx_d) + distMat(idx_b,idx_e) + distMat(idx_b,idx_f) + distMat(idx_b,idx_g) + ...
-                                                        distMat(idx_c,idx_d) + distMat(idx_c,idx_e) + distMat(idx_c,idx_f) + distMat(idx_c,idx_g) + ...
-                                                        distMat(idx_d,idx_e) + distMat(idx_d,idx_f) + distMat(idx_d,idx_g) + ...
-                                                        distMat(idx_e,idx_f) + distMat(idx_e,idx_g) + ...
-                                                        distMat(idx_f,idx_g)) / 21;
-                                                        
-                                            if avg_score > best_group_score
-                                                best_group_score  = avg_score;
-                                                best_idx_in_avail = [i, j, k, l, m, n, o];
-                                                found_any = true;
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-            % =========================================================
-            % CASE 8: 8 VÒNG LẶP LỒNG NHAU (28 CẶP KHOẢNG CÁCH)
-            % =========================================================
-            case 8
-                for i = 1:N_avail-7
-                    if time_out_flag, break; end
-                    idx_a = available_ues(i);
-                    for j = i+1:N_avail-6
-                        if time_out_flag, break; end
-                        idx_b = available_ues(j);
-                        for k = j+1:N_avail-5
-                            if time_out_flag, break; end
-                            idx_c = available_ues(k);
-                            for l = k+1:N_avail-4
-                                if time_out_flag, break; end
-                                idx_d = available_ues(l);
-                                for m = l+1:N_avail-3
-                                    if time_out_flag, break; end
-                                    idx_e = available_ues(m);
-                                    for n = m+1:N_avail-2
-                                        if time_out_flag, break; end
-                                        idx_f = available_ues(n);
-                                        for o = n+1:N_avail-1
-                                            if time_out_flag, break; end
-                                            idx_g = available_ues(o);
-                                            for p = o+1:N_avail
-                                                idx_h = available_ues(p);
-                                                
-                                                % --- KIỂM TRA TIMEOUT ---
-                                                loop_counter = loop_counter + 1;
-                                                if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
-                                                    fprintf('[TIMEOUT] Dừng quét nhóm 8 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
-                                                    time_out_flag = true; break;
-                                                end
-                                                
-                                                avg_score = (distMat(idx_a,idx_b) + distMat(idx_a,idx_c) + distMat(idx_a,idx_d) + distMat(idx_a,idx_e) + distMat(idx_a,idx_f) + distMat(idx_a,idx_g) + distMat(idx_a,idx_h) + ...
-                                                            distMat(idx_b,idx_c) + distMat(idx_b,idx_d) + distMat(idx_b,idx_e) + distMat(idx_b,idx_f) + distMat(idx_b,idx_g) + distMat(idx_b,idx_h) + ...
-                                                            distMat(idx_c,idx_d) + distMat(idx_c,idx_e) + distMat(idx_c,idx_f) + distMat(idx_c,idx_g) + distMat(idx_c,idx_h) + ...
-                                                            distMat(idx_d,idx_e) + distMat(idx_d,idx_f) + distMat(idx_d,idx_g) + distMat(idx_d,idx_h) + ...
-                                                            distMat(idx_e,idx_f) + distMat(idx_e,idx_g) + distMat(idx_e,idx_h) + ...
-                                                            distMat(idx_f,idx_g) + distMat(idx_f,idx_h) + ...
-                                                            distMat(idx_g,idx_h)) / 28;
-                                                            
-                                                if avg_score > best_group_score
-                                                    best_group_score  = avg_score;
-                                                    best_idx_in_avail = [i, j, k, l, m, n, o, p];
-                                                    found_any = true;
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-            % =========================================================
-            % CASE 9: 9 VÒNG LẶP LỒNG NHAU (36 CẶP KHOẢNG CÁCH)
-            % =========================================================
-            case 9
-                for i = 1:N_avail-8
-                    if time_out_flag, break; end; idx_a = available_ues(i);
-                    for j = i+1:N_avail-7
-                        if time_out_flag, break; end; idx_b = available_ues(j);
-                        for k = j+1:N_avail-6
-                            if time_out_flag, break; end; idx_c = available_ues(k);
-                            for l = k+1:N_avail-5
-                                if time_out_flag, break; end; idx_d = available_ues(l);
-                                for m = l+1:N_avail-4
-                                    if time_out_flag, break; end; idx_e = available_ues(m);
-                                    for n = m+1:N_avail-3
-                                        if time_out_flag, break; end; idx_f = available_ues(n);
-                                        for o = n+1:N_avail-2
-                                            if time_out_flag, break; end; idx_g = available_ues(o);
-                                            for p = o+1:N_avail-1
-                                                if time_out_flag, break; end; idx_h = available_ues(p);
-                                                for q = p+1:N_avail
-                                                    idx_i = available_ues(q);
-                                                    
-                                                    loop_counter = loop_counter + 1;
-                                                    if mod(loop_counter, 10000) == 0 && toc(t_search) > timeout_limit
-                                                        fprintf('[TIMEOUT] Dừng quét nhóm 9 sau %.1f s.\n', toc(t_search));
-                                                        time_out_flag = true; break;
-                                                    end
-                                                    
-                                                    avg_score = (distMat(idx_a,idx_b)+distMat(idx_a,idx_c)+distMat(idx_a,idx_d)+distMat(idx_a,idx_e)+distMat(idx_a,idx_f)+distMat(idx_a,idx_g)+distMat(idx_a,idx_h)+distMat(idx_a,idx_i) + ...
-                                                                distMat(idx_b,idx_c)+distMat(idx_b,idx_d)+distMat(idx_b,idx_e)+distMat(idx_b,idx_f)+distMat(idx_b,idx_g)+distMat(idx_b,idx_h)+distMat(idx_b,idx_i) + ...
-                                                                distMat(idx_c,idx_d)+distMat(idx_c,idx_e)+distMat(idx_c,idx_f)+distMat(idx_c,idx_g)+distMat(idx_c,idx_h)+distMat(idx_c,idx_i) + ...
-                                                                distMat(idx_d,idx_e)+distMat(idx_d,idx_f)+distMat(idx_d,idx_g)+distMat(idx_d,idx_h)+distMat(idx_d,idx_i) + ...
-                                                                distMat(idx_e,idx_f)+distMat(idx_e,idx_g)+distMat(idx_e,idx_h)+distMat(idx_e,idx_i) + ...
-                                                                distMat(idx_f,idx_g)+distMat(idx_f,idx_h)+distMat(idx_f,idx_i) + ...
-                                                                distMat(idx_g,idx_h)+distMat(idx_g,idx_i) + ...
-                                                                distMat(idx_h,idx_i)) / 36;
-                                                                
-                                                    if avg_score > best_group_score
-                                                        best_group_score = avg_score; best_idx_in_avail = [i, j, k, l, m, n, o, p, q]; found_any = true;
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-            % =========================================================
-            % CASE 10: 10 VÒNG LẶP LỒNG NHAU (45 CẶP KHOẢNG CÁCH)
-            % =========================================================
-            case 10
-                for i = 1:N_avail-9
-                    if time_out_flag, break; end; idx_a = available_ues(i);
-                    for j = i+1:N_avail-8
-                        if time_out_flag, break; end; idx_b = available_ues(j);
-                        for k = j+1:N_avail-7
-                            if time_out_flag, break; end; idx_c = available_ues(k);
-                            for l = k+1:N_avail-6
-                                if time_out_flag, break; end; idx_d = available_ues(l);
-                                for m = l+1:N_avail-5
-                                    if time_out_flag, break; end; idx_e = available_ues(m);
-                                    for n = m+1:N_avail-4
-                                        if time_out_flag, break; end; idx_f = available_ues(n);
-                                        for o = n+1:N_avail-3
-                                            if time_out_flag, break; end; idx_g = available_ues(o);
-                                            for p = o+1:N_avail-2
-                                                if time_out_flag, break; end; idx_h = available_ues(p);
-                                                for q = p+1:N_avail-1
-                                                    if time_out_flag, break; end; idx_i = available_ues(q);
-                                                    for r = q+1:N_avail
-                                                        idx_j = available_ues(r);
-                                                        
-                                                        loop_counter = loop_counter + 1;
-                                                        if mod(loop_counter, 10000) == 0 && toc(t_search) > timeout_limit
-                                                            fprintf('[TIMEOUT] Dừng quét nhóm 10 sau %.1f s.\n', toc(t_search));
-                                                            time_out_flag = true; break;
-                                                        end
-                                                        
-                                                        avg_score = (distMat(idx_a,idx_b)+distMat(idx_a,idx_c)+distMat(idx_a,idx_d)+distMat(idx_a,idx_e)+distMat(idx_a,idx_f)+distMat(idx_a,idx_g)+distMat(idx_a,idx_h)+distMat(idx_a,idx_i)+distMat(idx_a,idx_j) + ...
-                                                                    distMat(idx_b,idx_c)+distMat(idx_b,idx_d)+distMat(idx_b,idx_e)+distMat(idx_b,idx_f)+distMat(idx_b,idx_g)+distMat(idx_b,idx_h)+distMat(idx_b,idx_i)+distMat(idx_b,idx_j) + ...
-                                                                    distMat(idx_c,idx_d)+distMat(idx_c,idx_e)+distMat(idx_c,idx_f)+distMat(idx_c,idx_g)+distMat(idx_c,idx_h)+distMat(idx_c,idx_i)+distMat(idx_c,idx_j) + ...
-                                                                    distMat(idx_d,idx_e)+distMat(idx_d,idx_f)+distMat(idx_d,idx_g)+distMat(idx_d,idx_h)+distMat(idx_d,idx_i)+distMat(idx_d,idx_j) + ...
-                                                                    distMat(idx_e,idx_f)+distMat(idx_e,idx_g)+distMat(idx_e,idx_h)+distMat(idx_e,idx_i)+distMat(idx_e,idx_j) + ...
-                                                                    distMat(idx_f,idx_g)+distMat(idx_f,idx_h)+distMat(idx_f,idx_i)+distMat(idx_f,idx_j) + ...
-                                                                    distMat(idx_g,idx_h)+distMat(idx_g,idx_i)+distMat(idx_g,idx_j) + ...
-                                                                    distMat(idx_h,idx_i)+distMat(idx_h,idx_j) + ...
-                                                                    distMat(idx_i,idx_j)) / 45;
-                                                                    
-                                                        if avg_score > best_group_score
-                                                            best_group_score = avg_score; best_idx_in_avail = [i, j, k, l, m, n, o, p, q, r]; found_any = true;
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-            % =========================================================
-            % CASE 11: 11 VÒNG LẶP LỒNG NHAU (55 CẶP KHOẢNG CÁCH)
-            % =========================================================
-            case 11
-                for i = 1:N_avail-10
-                    if time_out_flag, break; end; idx_a = available_ues(i);
-                    for j = i+1:N_avail-9
-                        if time_out_flag, break; end; idx_b = available_ues(j);
-                        for k = j+1:N_avail-8
-                            if time_out_flag, break; end; idx_c = available_ues(k);
-                            for l = k+1:N_avail-7
-                                if time_out_flag, break; end; idx_d = available_ues(l);
-                                for m = l+1:N_avail-6
-                                    if time_out_flag, break; end; idx_e = available_ues(m);
-                                    for n = m+1:N_avail-5
-                                        if time_out_flag, break; end; idx_f = available_ues(n);
-                                        for o = n+1:N_avail-4
-                                            if time_out_flag, break; end; idx_g = available_ues(o);
-                                            for p = o+1:N_avail-3
-                                                if time_out_flag, break; end; idx_h = available_ues(p);
-                                                for q = p+1:N_avail-2
-                                                    if time_out_flag, break; end; idx_i = available_ues(q);
-                                                    for r = q+1:N_avail-1
-                                                        if time_out_flag, break; end; idx_j = available_ues(r);
-                                                        for s = r+1:N_avail
-                                                            idx_k = available_ues(s);
-                                                            
-                                                            loop_counter = loop_counter + 1;
-                                                            if mod(loop_counter, 10000) == 0 && toc(t_search) > timeout_limit
-                                                                fprintf('[TIMEOUT] Dừng quét nhóm 11 sau %.1f s.\n', toc(t_search));
-                                                                time_out_flag = true; break;
-                                                            end
-                                                            
-                                                            avg_score = (distMat(idx_a,idx_b)+distMat(idx_a,idx_c)+distMat(idx_a,idx_d)+distMat(idx_a,idx_e)+distMat(idx_a,idx_f)+distMat(idx_a,idx_g)+distMat(idx_a,idx_h)+distMat(idx_a,idx_i)+distMat(idx_a,idx_j)+distMat(idx_a,idx_k) + ...
-                                                                        distMat(idx_b,idx_c)+distMat(idx_b,idx_d)+distMat(idx_b,idx_e)+distMat(idx_b,idx_f)+distMat(idx_b,idx_g)+distMat(idx_b,idx_h)+distMat(idx_b,idx_i)+distMat(idx_b,idx_j)+distMat(idx_b,idx_k) + ...
-                                                                        distMat(idx_c,idx_d)+distMat(idx_c,idx_e)+distMat(idx_c,idx_f)+distMat(idx_c,idx_g)+distMat(idx_c,idx_h)+distMat(idx_c,idx_i)+distMat(idx_c,idx_j)+distMat(idx_c,idx_k) + ...
-                                                                        distMat(idx_d,idx_e)+distMat(idx_d,idx_f)+distMat(idx_d,idx_g)+distMat(idx_d,idx_h)+distMat(idx_d,idx_i)+distMat(idx_d,idx_j)+distMat(idx_d,idx_k) + ...
-                                                                        distMat(idx_e,idx_f)+distMat(idx_e,idx_g)+distMat(idx_e,idx_h)+distMat(idx_e,idx_i)+distMat(idx_e,idx_j)+distMat(idx_e,idx_k) + ...
-                                                                        distMat(idx_f,idx_g)+distMat(idx_f,idx_h)+distMat(idx_f,idx_i)+distMat(idx_f,idx_j)+distMat(idx_f,idx_k) + ...
-                                                                        distMat(idx_g,idx_h)+distMat(idx_g,idx_i)+distMat(idx_g,idx_j)+distMat(idx_g,idx_k) + ...
-                                                                        distMat(idx_h,idx_i)+distMat(idx_h,idx_j)+distMat(idx_h,idx_k) + ...
-                                                                        distMat(idx_i,idx_j)+distMat(idx_i,idx_k) + ...
-                                                                        distMat(idx_j,idx_k)) / 55;
-                                                                        
-                                                            if avg_score > best_group_score
-                                                                best_group_score = avg_score; best_idx_in_avail = [i, j, k, l, m, n, o, p, q, r, s]; found_any = true;
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-
-            % =========================================================
-            % CASE 12: 12 VÒNG LẶP LỒNG NHAU (66 CẶP KHOẢNG CÁCH)
-            % =========================================================
-            case 12
-                for i = 1:N_avail-11
-                    if time_out_flag, break; end; idx_a = available_ues(i);
-                    for j = i+1:N_avail-10
-                        if time_out_flag, break; end; idx_b = available_ues(j);
-                        for k = j+1:N_avail-9
-                            if time_out_flag, break; end; idx_c = available_ues(k);
-                            for l = k+1:N_avail-8
-                                if time_out_flag, break; end; idx_d = available_ues(l);
-                                for m = l+1:N_avail-7
-                                    if time_out_flag, break; end; idx_e = available_ues(m);
-                                    for n = m+1:N_avail-6
-                                        if time_out_flag, break; end; idx_f = available_ues(n);
-                                        for o = n+1:N_avail-5
-                                            if time_out_flag, break; end; idx_g = available_ues(o);
-                                            for p = o+1:N_avail-4
-                                                if time_out_flag, break; end; idx_h = available_ues(p);
-                                                for q = p+1:N_avail-3
-                                                    if time_out_flag, break; end; idx_i = available_ues(q);
-                                                    for r = q+1:N_avail-2
-                                                        if time_out_flag, break; end; idx_j = available_ues(r);
-                                                        for s = r+1:N_avail-1
-                                                            if time_out_flag, break; end; idx_k = available_ues(s);
-                                                            for t = s+1:N_avail
-                                                                idx_l = available_ues(t);
-                                                                
-                                                                loop_counter = loop_counter + 1;
-                                                                if mod(loop_counter, 10000) == 0 && toc(t_search) > timeout_limit
-                                                                    fprintf('[TIMEOUT] Dừng quét nhóm 12 sau %.1f s.\n', toc(t_search));
-                                                                    time_out_flag = true; break;
-                                                                end
-                                                                
-                                                                avg_score = (distMat(idx_a,idx_b)+distMat(idx_a,idx_c)+distMat(idx_a,idx_d)+distMat(idx_a,idx_e)+distMat(idx_a,idx_f)+distMat(idx_a,idx_g)+distMat(idx_a,idx_h)+distMat(idx_a,idx_i)+distMat(idx_a,idx_j)+distMat(idx_a,idx_k)+distMat(idx_a,idx_l) + ...
-                                                                            distMat(idx_b,idx_c)+distMat(idx_b,idx_d)+distMat(idx_b,idx_e)+distMat(idx_b,idx_f)+distMat(idx_b,idx_g)+distMat(idx_b,idx_h)+distMat(idx_b,idx_i)+distMat(idx_b,idx_j)+distMat(idx_b,idx_k)+distMat(idx_b,idx_l) + ...
-                                                                            distMat(idx_c,idx_d)+distMat(idx_c,idx_e)+distMat(idx_c,idx_f)+distMat(idx_c,idx_g)+distMat(idx_c,idx_h)+distMat(idx_c,idx_i)+distMat(idx_c,idx_j)+distMat(idx_c,idx_k)+distMat(idx_c,idx_l) + ...
-                                                                            distMat(idx_d,idx_e)+distMat(idx_d,idx_f)+distMat(idx_d,idx_g)+distMat(idx_d,idx_h)+distMat(idx_d,idx_i)+distMat(idx_d,idx_j)+distMat(idx_d,idx_k)+distMat(idx_d,idx_l) + ...
-                                                                            distMat(idx_e,idx_f)+distMat(idx_e,idx_g)+distMat(idx_e,idx_h)+distMat(idx_e,idx_i)+distMat(idx_e,idx_j)+distMat(idx_e,idx_k)+distMat(idx_e,idx_l) + ...
-                                                                            distMat(idx_f,idx_g)+distMat(idx_f,idx_h)+distMat(idx_f,idx_i)+distMat(idx_f,idx_j)+distMat(idx_f,idx_k)+distMat(idx_f,idx_l) + ...
-                                                                            distMat(idx_g,idx_h)+distMat(idx_g,idx_i)+distMat(idx_g,idx_j)+distMat(idx_g,idx_k)+distMat(idx_g,idx_l) + ...
-                                                                            distMat(idx_h,idx_i)+distMat(idx_h,idx_j)+distMat(idx_h,idx_k)+distMat(idx_h,idx_l) + ...
-                                                                            distMat(idx_i,idx_j)+distMat(idx_i,idx_k)+distMat(idx_i,idx_l) + ...
-                                                                            distMat(idx_j,idx_k)+distMat(idx_j,idx_l) + ...
-                                                                            distMat(idx_k,idx_l)) / 66;
-                                                                            
-                                                                if avg_score > best_group_score
-                                                                    best_group_score = avg_score; best_idx_in_avail = [i, j, k, l, m, n, o, p, q, r, s, t]; found_any = true;
-                                                                end
-                                                            end
-                                                        end
-                                                    end
-                                                end
-                                            end
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
+            % case 2
+            %     for i = 1:N_avail-1
+            %         if time_out_flag, break; end
+            %         idx_a = available_ues(i);
+            %         for j = i+1:N_avail
+            %             idx_b = available_ues(j);
+            % 
+            %             % --- KIỂM TRA TIMEOUT ---
+            %             loop_counter = loop_counter + 1;
+            %             if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
+            %                 fprintf('[TIMEOUT] Dừng quét nhóm 2 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
+            %                 time_out_flag = true; break;
+            %             end
+            % 
+            %             avg_score = distMat(idx_a, idx_b);
+            %             if avg_score > best_group_score
+            %                 best_group_score  = avg_score;
+            %                 best_idx_in_avail = [i, j];
+            %                 found_any = true;
+            %             end
+            %         end
+            %     end
+            % 
+            % case 3
+            %     for i = 1:N_avail-2
+            %         if time_out_flag, break; end
+            %         idx_a = available_ues(i);
+            %         for j = i+1:N_avail-1
+            %             if time_out_flag, break; end
+            %             idx_b = available_ues(j);
+            %             d1 = distMat(idx_a, idx_b);
+            %             for k = j+1:N_avail
+            %                 idx_c = available_ues(k);
+            % 
+            %                 % --- KIỂM TRA TIMEOUT ---
+            %                 loop_counter = loop_counter + 1;
+            %                 if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
+            %                     fprintf('[TIMEOUT] Dừng quét nhóm 3 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
+            %                     time_out_flag = true; break;
+            %                 end
+            % 
+            %                 avg_score = (d1 + distMat(idx_a,idx_c) + distMat(idx_b,idx_c)) / 3;
+            %                 if avg_score > best_group_score
+            %                     best_group_score  = avg_score;
+            %                     best_idx_in_avail = [i, j, k];
+            %                     found_any = true;
+            %                 end
+            %             end
+            %         end
+            %     end
+            % 
+            % case 4
+            %     for i = 1:N_avail-3
+            %         if time_out_flag, break; end
+            %         idx_a = available_ues(i);
+            %         for j = i+1:N_avail-2
+            %             if time_out_flag, break; end
+            %             idx_b = available_ues(j);
+            %             d1 = distMat(idx_a, idx_b);
+            %             for k = j+1:N_avail-1
+            %                 if time_out_flag, break; end
+            %                 idx_c = available_ues(k);
+            %                 d2 = distMat(idx_a, idx_c);
+            %                 d4 = distMat(idx_b, idx_c);
+            %                 for l = k+1:N_avail
+            %                     idx_d = available_ues(l);
+            % 
+            %                     % --- KIỂM TRA TIMEOUT ---
+            %                     loop_counter = loop_counter + 1;
+            %                     if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
+            %                         fprintf('[TIMEOUT] Dừng quét nhóm 4 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
+            %                         time_out_flag = true; break;
+            %                     end
+            % 
+            %                     avg_score = (d1 + d2 + distMat(idx_a,idx_d) + ...
+            %                                 d4 + distMat(idx_b,idx_d) + distMat(idx_c,idx_d)) / 6;
+            %                     if avg_score > best_group_score
+            %                         best_group_score  = avg_score;
+            %                         best_idx_in_avail = [i, j, k, l];
+            %                         found_any = true;
+            %                     end
+            %                 end
+            %             end
+            %         end
+            %     end
+            % 
+            % % =========================================================
+            % % CASE 5: 5 VÒNG LẶP LỒNG NHAU (10 CẶP KHOẢNG CÁCH)
+            % % =========================================================
+            % case 5
+            %     for i = 1:N_avail-4
+            %         if time_out_flag, break; end
+            %         idx_a = available_ues(i);
+            %         for j = i+1:N_avail-3
+            %             if time_out_flag, break; end
+            %             idx_b = available_ues(j);
+            %             for k = j+1:N_avail-2
+            %                 if time_out_flag, break; end
+            %                 idx_c = available_ues(k);
+            %                 for l = k+1:N_avail-1
+            %                     if time_out_flag, break; end
+            %                     idx_d = available_ues(l);
+            %                     for m = l+1:N_avail
+            %                         idx_e = available_ues(m);
+            % 
+            %                         % --- KIỂM TRA TIMEOUT ---
+            %                         loop_counter = loop_counter + 1;
+            %                         if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
+            %                             fprintf('[TIMEOUT] Dừng quét nhóm 5 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
+            %                             time_out_flag = true; break;
+            %                         end
+            % 
+            %                         avg_score = (distMat(idx_a,idx_b) + distMat(idx_a,idx_c) + distMat(idx_a,idx_d) + distMat(idx_a,idx_e) + ...
+            %                                     distMat(idx_b,idx_c) + distMat(idx_b,idx_d) + distMat(idx_b,idx_e) + ...
+            %                                     distMat(idx_c,idx_d) + distMat(idx_c,idx_e) + ...
+            %                                     distMat(idx_d,idx_e)) / 10;
+            % 
+            %                         if avg_score > best_group_score
+            %                             best_group_score  = avg_score;
+            %                             best_idx_in_avail = [i, j, k, l, m];
+            %                             found_any = true;
+            %                         end
+            %                     end
+            %                 end
+            %             end
+            %         end
+            %     end
+            % 
+            % % =========================================================
+            % % CASE 6: 6 VÒNG LẶP LỒNG NHAU (15 CẶP KHOẢNG CÁCH)
+            % % =========================================================
+            % case 6
+            %     for i = 1:N_avail-5
+            %         if time_out_flag, break; end
+            %         idx_a = available_ues(i);
+            %         for j = i+1:N_avail-4
+            %             if time_out_flag, break; end
+            %             idx_b = available_ues(j);
+            %             for k = j+1:N_avail-3
+            %                 if time_out_flag, break; end
+            %                 idx_c = available_ues(k);
+            %                 for l = k+1:N_avail-2
+            %                     if time_out_flag, break; end
+            %                     idx_d = available_ues(l);
+            %                     for m = l+1:N_avail-1
+            %                         if time_out_flag, break; end
+            %                         idx_e = available_ues(m);
+            %                         for n = m+1:N_avail
+            %                             idx_f = available_ues(n);
+            % 
+            %                             % --- KIỂM TRA TIMEOUT ---
+            %                             loop_counter = loop_counter + 1;
+            %                             if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
+            %                                 fprintf('[TIMEOUT] Dừng quét nhóm 6 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
+            %                                 time_out_flag = true; break;
+            %                             end
+            % 
+            %                             avg_score = (distMat(idx_a,idx_b) + distMat(idx_a,idx_c) + distMat(idx_a,idx_d) + distMat(idx_a,idx_e) + distMat(idx_a,idx_f) + ...
+            %                                         distMat(idx_b,idx_c) + distMat(idx_b,idx_d) + distMat(idx_b,idx_e) + distMat(idx_b,idx_f) + ...
+            %                                         distMat(idx_c,idx_d) + distMat(idx_c,idx_e) + distMat(idx_c,idx_f) + ...
+            %                                         distMat(idx_d,idx_e) + distMat(idx_d,idx_f) + ...
+            %                                         distMat(idx_e,idx_f)) / 15;
+            % 
+            %                             if avg_score > best_group_score
+            %                                 best_group_score  = avg_score;
+            %                                 best_idx_in_avail = [i, j, k, l, m, n];
+            %                                 found_any = true;
+            %                             end
+            %                         end
+            %                     end
+            %                 end
+            %             end
+            %         end
+            %     end
+            % 
+            % % =========================================================
+            % % CASE 7: 7 VÒNG LẶP LỒNG NHAU (21 CẶP KHOẢNG CÁCH)
+            % % =========================================================
+            % case 7
+            %     for i = 1:N_avail-6
+            %         if time_out_flag, break; end
+            %         idx_a = available_ues(i);
+            %         for j = i+1:N_avail-5
+            %             if time_out_flag, break; end
+            %             idx_b = available_ues(j);
+            %             for k = j+1:N_avail-4
+            %                 if time_out_flag, break; end
+            %                 idx_c = available_ues(k);
+            %                 for l = k+1:N_avail-3
+            %                     if time_out_flag, break; end
+            %                     idx_d = available_ues(l);
+            %                     for m = l+1:N_avail-2
+            %                         if time_out_flag, break; end
+            %                         idx_e = available_ues(m);
+            %                         for n = m+1:N_avail-1
+            %                             if time_out_flag, break; end
+            %                             idx_f = available_ues(n);
+            %                             for o = n+1:N_avail
+            %                                 idx_g = available_ues(o);
+            % 
+            %                                 % --- KIỂM TRA TIMEOUT ---
+            %                                 loop_counter = loop_counter + 1;
+            %                                 if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
+            %                                     fprintf('[TIMEOUT] Dừng quét nhóm 7 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
+            %                                     time_out_flag = true; break;
+            %                                 end
+            % 
+            %                                 avg_score = (distMat(idx_a,idx_b) + distMat(idx_a,idx_c) + distMat(idx_a,idx_d) + distMat(idx_a,idx_e) + distMat(idx_a,idx_f) + distMat(idx_a,idx_g) + ...
+            %                                             distMat(idx_b,idx_c) + distMat(idx_b,idx_d) + distMat(idx_b,idx_e) + distMat(idx_b,idx_f) + distMat(idx_b,idx_g) + ...
+            %                                             distMat(idx_c,idx_d) + distMat(idx_c,idx_e) + distMat(idx_c,idx_f) + distMat(idx_c,idx_g) + ...
+            %                                             distMat(idx_d,idx_e) + distMat(idx_d,idx_f) + distMat(idx_d,idx_g) + ...
+            %                                             distMat(idx_e,idx_f) + distMat(idx_e,idx_g) + ...
+            %                                             distMat(idx_f,idx_g)) / 21;
+            % 
+            %                                 if avg_score > best_group_score
+            %                                     best_group_score  = avg_score;
+            %                                     best_idx_in_avail = [i, j, k, l, m, n, o];
+            %                                     found_any = true;
+            %                                 end
+            %                             end
+            %                         end
+            %                     end
+            %                 end
+            %             end
+            %         end
+            %     end
+            % 
+            % % =========================================================
+            % % CASE 8: 8 VÒNG LẶP LỒNG NHAU (28 CẶP KHOẢNG CÁCH)
+            % % =========================================================
+            % case 8
+            %     for i = 1:N_avail-7
+            %         if time_out_flag, break; end
+            %         idx_a = available_ues(i);
+            %         for j = i+1:N_avail-6
+            %             if time_out_flag, break; end
+            %             idx_b = available_ues(j);
+            %             for k = j+1:N_avail-5
+            %                 if time_out_flag, break; end
+            %                 idx_c = available_ues(k);
+            %                 for l = k+1:N_avail-4
+            %                     if time_out_flag, break; end
+            %                     idx_d = available_ues(l);
+            %                     for m = l+1:N_avail-3
+            %                         if time_out_flag, break; end
+            %                         idx_e = available_ues(m);
+            %                         for n = m+1:N_avail-2
+            %                             if time_out_flag, break; end
+            %                             idx_f = available_ues(n);
+            %                             for o = n+1:N_avail-1
+            %                                 if time_out_flag, break; end
+            %                                 idx_g = available_ues(o);
+            %                                 for p = o+1:N_avail
+            %                                     idx_h = available_ues(p);
+            % 
+            %                                     % --- KIỂM TRA TIMEOUT ---
+            %                                     loop_counter = loop_counter + 1;
+            %                                     if mod(loop_counter, 100000) == 0 && toc(t_search) > timeout_limit
+            %                                         fprintf('[TIMEOUT] Dừng quét nhóm 8 sau %.1f giây (%d tổ hợp).\n', toc(t_search), loop_counter);
+            %                                         time_out_flag = true; break;
+            %                                     end
+            % 
+            %                                     avg_score = (distMat(idx_a,idx_b) + distMat(idx_a,idx_c) + distMat(idx_a,idx_d) + distMat(idx_a,idx_e) + distMat(idx_a,idx_f) + distMat(idx_a,idx_g) + distMat(idx_a,idx_h) + ...
+            %                                                 distMat(idx_b,idx_c) + distMat(idx_b,idx_d) + distMat(idx_b,idx_e) + distMat(idx_b,idx_f) + distMat(idx_b,idx_g) + distMat(idx_b,idx_h) + ...
+            %                                                 distMat(idx_c,idx_d) + distMat(idx_c,idx_e) + distMat(idx_c,idx_f) + distMat(idx_c,idx_g) + distMat(idx_c,idx_h) + ...
+            %                                                 distMat(idx_d,idx_e) + distMat(idx_d,idx_f) + distMat(idx_d,idx_g) + distMat(idx_d,idx_h) + ...
+            %                                                 distMat(idx_e,idx_f) + distMat(idx_e,idx_g) + distMat(idx_e,idx_h) + ...
+            %                                                 distMat(idx_f,idx_g) + distMat(idx_f,idx_h) + ...
+            %                                                 distMat(idx_g,idx_h)) / 28;
+            % 
+            %                                     if avg_score > best_group_score
+            %                                         best_group_score  = avg_score;
+            %                                         best_idx_in_avail = [i, j, k, l, m, n, o, p];
+            %                                         found_any = true;
+            %                                     end
+            %                                 end
+            %                             end
+            %                         end
+            %                     end
+            %                 end
+            %             end
+            %         end
+            %     end
+            % 
+            % % =========================================================
+            % % CASE 9: 9 VÒNG LẶP LỒNG NHAU (36 CẶP KHOẢNG CÁCH)
+            % % =========================================================
+            % case 9
+            %     for i = 1:N_avail-8
+            %         if time_out_flag, break; end; idx_a = available_ues(i);
+            %         for j = i+1:N_avail-7
+            %             if time_out_flag, break; end; idx_b = available_ues(j);
+            %             for k = j+1:N_avail-6
+            %                 if time_out_flag, break; end; idx_c = available_ues(k);
+            %                 for l = k+1:N_avail-5
+            %                     if time_out_flag, break; end; idx_d = available_ues(l);
+            %                     for m = l+1:N_avail-4
+            %                         if time_out_flag, break; end; idx_e = available_ues(m);
+            %                         for n = m+1:N_avail-3
+            %                             if time_out_flag, break; end; idx_f = available_ues(n);
+            %                             for o = n+1:N_avail-2
+            %                                 if time_out_flag, break; end; idx_g = available_ues(o);
+            %                                 for p = o+1:N_avail-1
+            %                                     if time_out_flag, break; end; idx_h = available_ues(p);
+            %                                     for q = p+1:N_avail
+            %                                         idx_i = available_ues(q);
+            % 
+            %                                         loop_counter = loop_counter + 1;
+            %                                         if mod(loop_counter, 10000) == 0 && toc(t_search) > timeout_limit
+            %                                             fprintf('[TIMEOUT] Dừng quét nhóm 9 sau %.1f s.\n', toc(t_search));
+            %                                             time_out_flag = true; break;
+            %                                         end
+            % 
+            %                                         avg_score = (distMat(idx_a,idx_b)+distMat(idx_a,idx_c)+distMat(idx_a,idx_d)+distMat(idx_a,idx_e)+distMat(idx_a,idx_f)+distMat(idx_a,idx_g)+distMat(idx_a,idx_h)+distMat(idx_a,idx_i) + ...
+            %                                                     distMat(idx_b,idx_c)+distMat(idx_b,idx_d)+distMat(idx_b,idx_e)+distMat(idx_b,idx_f)+distMat(idx_b,idx_g)+distMat(idx_b,idx_h)+distMat(idx_b,idx_i) + ...
+            %                                                     distMat(idx_c,idx_d)+distMat(idx_c,idx_e)+distMat(idx_c,idx_f)+distMat(idx_c,idx_g)+distMat(idx_c,idx_h)+distMat(idx_c,idx_i) + ...
+            %                                                     distMat(idx_d,idx_e)+distMat(idx_d,idx_f)+distMat(idx_d,idx_g)+distMat(idx_d,idx_h)+distMat(idx_d,idx_i) + ...
+            %                                                     distMat(idx_e,idx_f)+distMat(idx_e,idx_g)+distMat(idx_e,idx_h)+distMat(idx_e,idx_i) + ...
+            %                                                     distMat(idx_f,idx_g)+distMat(idx_f,idx_h)+distMat(idx_f,idx_i) + ...
+            %                                                     distMat(idx_g,idx_h)+distMat(idx_g,idx_i) + ...
+            %                                                     distMat(idx_h,idx_i)) / 36;
+            % 
+            %                                         if avg_score > best_group_score
+            %                                             best_group_score = avg_score; best_idx_in_avail = [i, j, k, l, m, n, o, p, q]; found_any = true;
+            %                                         end
+            %                                     end
+            %                                 end
+            %                             end
+            %                         end
+            %                     end
+            %                 end
+            %             end
+            %         end
+            %     end
+            % 
+            % % =========================================================
+            % % CASE 10: 10 VÒNG LẶP LỒNG NHAU (45 CẶP KHOẢNG CÁCH)
+            % % =========================================================
+            % case 10
+            %     for i = 1:N_avail-9
+            %         if time_out_flag, break; end; idx_a = available_ues(i);
+            %         for j = i+1:N_avail-8
+            %             if time_out_flag, break; end; idx_b = available_ues(j);
+            %             for k = j+1:N_avail-7
+            %                 if time_out_flag, break; end; idx_c = available_ues(k);
+            %                 for l = k+1:N_avail-6
+            %                     if time_out_flag, break; end; idx_d = available_ues(l);
+            %                     for m = l+1:N_avail-5
+            %                         if time_out_flag, break; end; idx_e = available_ues(m);
+            %                         for n = m+1:N_avail-4
+            %                             if time_out_flag, break; end; idx_f = available_ues(n);
+            %                             for o = n+1:N_avail-3
+            %                                 if time_out_flag, break; end; idx_g = available_ues(o);
+            %                                 for p = o+1:N_avail-2
+            %                                     if time_out_flag, break; end; idx_h = available_ues(p);
+            %                                     for q = p+1:N_avail-1
+            %                                         if time_out_flag, break; end; idx_i = available_ues(q);
+            %                                         for r = q+1:N_avail
+            %                                             idx_j = available_ues(r);
+            % 
+            %                                             loop_counter = loop_counter + 1;
+            %                                             if mod(loop_counter, 10000) == 0 && toc(t_search) > timeout_limit
+            %                                                 fprintf('[TIMEOUT] Dừng quét nhóm 10 sau %.1f s.\n', toc(t_search));
+            %                                                 time_out_flag = true; break;
+            %                                             end
+            % 
+            %                                             avg_score = (distMat(idx_a,idx_b)+distMat(idx_a,idx_c)+distMat(idx_a,idx_d)+distMat(idx_a,idx_e)+distMat(idx_a,idx_f)+distMat(idx_a,idx_g)+distMat(idx_a,idx_h)+distMat(idx_a,idx_i)+distMat(idx_a,idx_j) + ...
+            %                                                         distMat(idx_b,idx_c)+distMat(idx_b,idx_d)+distMat(idx_b,idx_e)+distMat(idx_b,idx_f)+distMat(idx_b,idx_g)+distMat(idx_b,idx_h)+distMat(idx_b,idx_i)+distMat(idx_b,idx_j) + ...
+            %                                                         distMat(idx_c,idx_d)+distMat(idx_c,idx_e)+distMat(idx_c,idx_f)+distMat(idx_c,idx_g)+distMat(idx_c,idx_h)+distMat(idx_c,idx_i)+distMat(idx_c,idx_j) + ...
+            %                                                         distMat(idx_d,idx_e)+distMat(idx_d,idx_f)+distMat(idx_d,idx_g)+distMat(idx_d,idx_h)+distMat(idx_d,idx_i)+distMat(idx_d,idx_j) + ...
+            %                                                         distMat(idx_e,idx_f)+distMat(idx_e,idx_g)+distMat(idx_e,idx_h)+distMat(idx_e,idx_i)+distMat(idx_e,idx_j) + ...
+            %                                                         distMat(idx_f,idx_g)+distMat(idx_f,idx_h)+distMat(idx_f,idx_i)+distMat(idx_f,idx_j) + ...
+            %                                                         distMat(idx_g,idx_h)+distMat(idx_g,idx_i)+distMat(idx_g,idx_j) + ...
+            %                                                         distMat(idx_h,idx_i)+distMat(idx_h,idx_j) + ...
+            %                                                         distMat(idx_i,idx_j)) / 45;
+            % 
+            %                                             if avg_score > best_group_score
+            %                                                 best_group_score = avg_score; best_idx_in_avail = [i, j, k, l, m, n, o, p, q, r]; found_any = true;
+            %                                             end
+            %                                         end
+            %                                     end
+            %                                 end
+            %                             end
+            %                         end
+            %                     end
+            %                 end
+            %             end
+            %         end
+            %     end
+            % 
+            % % =========================================================
+            % % CASE 11: 11 VÒNG LẶP LỒNG NHAU (55 CẶP KHOẢNG CÁCH)
+            % % =========================================================
+            % case 11
+            %     for i = 1:N_avail-10
+            %         if time_out_flag, break; end; idx_a = available_ues(i);
+            %         for j = i+1:N_avail-9
+            %             if time_out_flag, break; end; idx_b = available_ues(j);
+            %             for k = j+1:N_avail-8
+            %                 if time_out_flag, break; end; idx_c = available_ues(k);
+            %                 for l = k+1:N_avail-7
+            %                     if time_out_flag, break; end; idx_d = available_ues(l);
+            %                     for m = l+1:N_avail-6
+            %                         if time_out_flag, break; end; idx_e = available_ues(m);
+            %                         for n = m+1:N_avail-5
+            %                             if time_out_flag, break; end; idx_f = available_ues(n);
+            %                             for o = n+1:N_avail-4
+            %                                 if time_out_flag, break; end; idx_g = available_ues(o);
+            %                                 for p = o+1:N_avail-3
+            %                                     if time_out_flag, break; end; idx_h = available_ues(p);
+            %                                     for q = p+1:N_avail-2
+            %                                         if time_out_flag, break; end; idx_i = available_ues(q);
+            %                                         for r = q+1:N_avail-1
+            %                                             if time_out_flag, break; end; idx_j = available_ues(r);
+            %                                             for s = r+1:N_avail
+            %                                                 idx_k = available_ues(s);
+            % 
+            %                                                 loop_counter = loop_counter + 1;
+            %                                                 if mod(loop_counter, 10000) == 0 && toc(t_search) > timeout_limit
+            %                                                     fprintf('[TIMEOUT] Dừng quét nhóm 11 sau %.1f s.\n', toc(t_search));
+            %                                                     time_out_flag = true; break;
+            %                                                 end
+            % 
+            %                                                 avg_score = (distMat(idx_a,idx_b)+distMat(idx_a,idx_c)+distMat(idx_a,idx_d)+distMat(idx_a,idx_e)+distMat(idx_a,idx_f)+distMat(idx_a,idx_g)+distMat(idx_a,idx_h)+distMat(idx_a,idx_i)+distMat(idx_a,idx_j)+distMat(idx_a,idx_k) + ...
+            %                                                             distMat(idx_b,idx_c)+distMat(idx_b,idx_d)+distMat(idx_b,idx_e)+distMat(idx_b,idx_f)+distMat(idx_b,idx_g)+distMat(idx_b,idx_h)+distMat(idx_b,idx_i)+distMat(idx_b,idx_j)+distMat(idx_b,idx_k) + ...
+            %                                                             distMat(idx_c,idx_d)+distMat(idx_c,idx_e)+distMat(idx_c,idx_f)+distMat(idx_c,idx_g)+distMat(idx_c,idx_h)+distMat(idx_c,idx_i)+distMat(idx_c,idx_j)+distMat(idx_c,idx_k) + ...
+            %                                                             distMat(idx_d,idx_e)+distMat(idx_d,idx_f)+distMat(idx_d,idx_g)+distMat(idx_d,idx_h)+distMat(idx_d,idx_i)+distMat(idx_d,idx_j)+distMat(idx_d,idx_k) + ...
+            %                                                             distMat(idx_e,idx_f)+distMat(idx_e,idx_g)+distMat(idx_e,idx_h)+distMat(idx_e,idx_i)+distMat(idx_e,idx_j)+distMat(idx_e,idx_k) + ...
+            %                                                             distMat(idx_f,idx_g)+distMat(idx_f,idx_h)+distMat(idx_f,idx_i)+distMat(idx_f,idx_j)+distMat(idx_f,idx_k) + ...
+            %                                                             distMat(idx_g,idx_h)+distMat(idx_g,idx_i)+distMat(idx_g,idx_j)+distMat(idx_g,idx_k) + ...
+            %                                                             distMat(idx_h,idx_i)+distMat(idx_h,idx_j)+distMat(idx_h,idx_k) + ...
+            %                                                             distMat(idx_i,idx_j)+distMat(idx_i,idx_k) + ...
+            %                                                             distMat(idx_j,idx_k)) / 55;
+            % 
+            %                                                 if avg_score > best_group_score
+            %                                                     best_group_score = avg_score; best_idx_in_avail = [i, j, k, l, m, n, o, p, q, r, s]; found_any = true;
+            %                                                 end
+            %                                             end
+            %                                         end
+            %                                     end
+            %                                 end
+            %                             end
+            %                         end
+            %                     end
+            %                 end
+            %             end
+            %         end
+            %     end
+            % 
+            % % =========================================================
+            % % CASE 12: 12 VÒNG LẶP LỒNG NHAU (66 CẶP KHOẢNG CÁCH)
+            % % =========================================================
+            % case 12
+            %     for i = 1:N_avail-11
+            %         if time_out_flag, break; end; idx_a = available_ues(i);
+            %         for j = i+1:N_avail-10
+            %             if time_out_flag, break; end; idx_b = available_ues(j);
+            %             for k = j+1:N_avail-9
+            %                 if time_out_flag, break; end; idx_c = available_ues(k);
+            %                 for l = k+1:N_avail-8
+            %                     if time_out_flag, break; end; idx_d = available_ues(l);
+            %                     for m = l+1:N_avail-7
+            %                         if time_out_flag, break; end; idx_e = available_ues(m);
+            %                         for n = m+1:N_avail-6
+            %                             if time_out_flag, break; end; idx_f = available_ues(n);
+            %                             for o = n+1:N_avail-5
+            %                                 if time_out_flag, break; end; idx_g = available_ues(o);
+            %                                 for p = o+1:N_avail-4
+            %                                     if time_out_flag, break; end; idx_h = available_ues(p);
+            %                                     for q = p+1:N_avail-3
+            %                                         if time_out_flag, break; end; idx_i = available_ues(q);
+            %                                         for r = q+1:N_avail-2
+            %                                             if time_out_flag, break; end; idx_j = available_ues(r);
+            %                                             for s = r+1:N_avail-1
+            %                                                 if time_out_flag, break; end; idx_k = available_ues(s);
+            %                                                 for t = s+1:N_avail
+            %                                                     idx_l = available_ues(t);
+            % 
+            %                                                     loop_counter = loop_counter + 1;
+            %                                                     if mod(loop_counter, 10000) == 0 && toc(t_search) > timeout_limit
+            %                                                         fprintf('[TIMEOUT] Dừng quét nhóm 12 sau %.1f s.\n', toc(t_search));
+            %                                                         time_out_flag = true; break;
+            %                                                     end
+            % 
+            %                                                     avg_score = (distMat(idx_a,idx_b)+distMat(idx_a,idx_c)+distMat(idx_a,idx_d)+distMat(idx_a,idx_e)+distMat(idx_a,idx_f)+distMat(idx_a,idx_g)+distMat(idx_a,idx_h)+distMat(idx_a,idx_i)+distMat(idx_a,idx_j)+distMat(idx_a,idx_k)+distMat(idx_a,idx_l) + ...
+            %                                                                 distMat(idx_b,idx_c)+distMat(idx_b,idx_d)+distMat(idx_b,idx_e)+distMat(idx_b,idx_f)+distMat(idx_b,idx_g)+distMat(idx_b,idx_h)+distMat(idx_b,idx_i)+distMat(idx_b,idx_j)+distMat(idx_b,idx_k)+distMat(idx_b,idx_l) + ...
+            %                                                                 distMat(idx_c,idx_d)+distMat(idx_c,idx_e)+distMat(idx_c,idx_f)+distMat(idx_c,idx_g)+distMat(idx_c,idx_h)+distMat(idx_c,idx_i)+distMat(idx_c,idx_j)+distMat(idx_c,idx_k)+distMat(idx_c,idx_l) + ...
+            %                                                                 distMat(idx_d,idx_e)+distMat(idx_d,idx_f)+distMat(idx_d,idx_g)+distMat(idx_d,idx_h)+distMat(idx_d,idx_i)+distMat(idx_d,idx_j)+distMat(idx_d,idx_k)+distMat(idx_d,idx_l) + ...
+            %                                                                 distMat(idx_e,idx_f)+distMat(idx_e,idx_g)+distMat(idx_e,idx_h)+distMat(idx_e,idx_i)+distMat(idx_e,idx_j)+distMat(idx_e,idx_k)+distMat(idx_e,idx_l) + ...
+            %                                                                 distMat(idx_f,idx_g)+distMat(idx_f,idx_h)+distMat(idx_f,idx_i)+distMat(idx_f,idx_j)+distMat(idx_f,idx_k)+distMat(idx_f,idx_l) + ...
+            %                                                                 distMat(idx_g,idx_h)+distMat(idx_g,idx_i)+distMat(idx_g,idx_j)+distMat(idx_g,idx_k)+distMat(idx_g,idx_l) + ...
+            %                                                                 distMat(idx_h,idx_i)+distMat(idx_h,idx_j)+distMat(idx_h,idx_k)+distMat(idx_h,idx_l) + ...
+            %                                                                 distMat(idx_i,idx_j)+distMat(idx_i,idx_k)+distMat(idx_i,idx_l) + ...
+            %                                                                 distMat(idx_j,idx_k)+distMat(idx_j,idx_l) + ...
+            %                                                                 distMat(idx_k,idx_l)) / 66;
+            % 
+            %                                                     if avg_score > best_group_score
+            %                                                         best_group_score = avg_score; best_idx_in_avail = [i, j, k, l, m, n, o, p, q, r, s, t]; found_any = true;
+            %                                                     end
+            %                                                 end
+            %                                             end
+            %                                         end
+            %                                     end
+            %                                 end
+            %                             end
+            %                         end
+            %                     end
+            %                 end
+            %             end
+            %         end
+            %     end
         end
         % =========================================================
 

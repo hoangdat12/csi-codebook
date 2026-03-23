@@ -6,7 +6,6 @@ function W = getPrecodingMatrixByPMISinglePannel(cfg, nLayers, pmi)
     [i1, i2] = getParameters(cfg, nLayers, pmi);
 
     W = generateTypeISinglePanelPrecoder(cfg, nLayers, i1, i2);
-    disp(W);
 end
 
 % ---------------------------------------------------------

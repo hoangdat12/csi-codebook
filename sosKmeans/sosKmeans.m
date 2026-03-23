@@ -374,7 +374,6 @@ function BER_list = simulateMuMimoGroup(W_pool, bestGroups, config, groupSize)
 
     % =========================================================
     % Select DMRS Type and Length
-    % Port reuse is allowed when total streams exceed 12
     % =========================================================
     if totalPorts <= 4
         pdsch.DMRS.DMRSConfigurationType = 1;
@@ -387,7 +386,7 @@ function BER_list = simulateMuMimoGroup(W_pool, bestGroups, config, groupSize)
         pdsch.DMRS.DMRSConfigurationType = 2;
         pdsch.DMRS.DMRSLength            = 2;
         if totalPorts > 12
-            fprintf('[Note] %d ports requested. DMRS Port Reuse will be applied (5G NR supports max 12 orthogonal ports).\n', totalPorts);
+            fprintf('[Note] %d ports requested. DMRS Port Reuse and Scrambling will be applied.\n', totalPorts);
         end
     end
 
@@ -434,13 +433,16 @@ function BER_list = muMimo(carrier, basePDSCHConfig, UE_W_list, MCS, SNR_dB)
         logicalPortStart = (u-1) * nLayers;
         logicalPorts     = logicalPortStart : logicalPortStart + nLayers - 1;
 
-        % --- APPLY DMRS PORT REUSE ---
+        % --- CẬP NHẬT DMRS PORT REUSE & SCRAMBLING ---
         physicalPorts = mod(logicalPorts, maxPortIndex + 1);
         pd.DMRS.DMRSPortSet = physicalPorts;
         
         % Alternate NSCID to reduce inter-user interference under port reuse
         reuseFactor = floor(logicalPortStart / (maxPortIndex + 1));
         pd.DMRS.NSCID = mod(reuseFactor, 2);
+        
+        % Đảm bảo chuỗi DMRS được xáo trộn khác nhau khi tái sử dụng port
+        pd.DMRS.NIDNSCID = pd.DMRS.NSCID; 
         
         % Configure CDM groups to prevent PDSCH from overlapping DMRS
         if dmrsType == 1
@@ -459,15 +461,24 @@ function BER_list = muMimo(carrier, basePDSCHConfig, UE_W_list, MCS, SNR_dB)
         inputBits_list{u} = randi([0 1], TBS, 1);
     end
 
-    % MMSE Precoding (getMMSEPrecoder takes 2 arguments as updated)
+    % MMSE Precoding
     H_composite = cell2mat(cellfun(@(w) w', UE_W_list(:), 'UniformOutput', false));
     W_total_T   = getMMSEPrecoder(H_composite, SNR_dB);
+
+    % --- CẬP NHẬT CHUẨN HÓA VÀ PHÂN BỔ CÔNG SUẤT (EQUAL POWER ALLOCATION) ---
+    % Chuẩn hóa tổng thể ma trận tiền mã hóa
+    normFactor = norm(W_total_T, 'fro');
+    W_total_T_norm = W_total_T / normFactor;
 
     W_list = cell(numUE, 1);
     for u = 1:numUE
         rowStart  = (u-1)*nLayers + 1;
-        W_list{u} = W_total_T(rowStart : u*nLayers, :);
+        W_ue = W_total_T_norm(rowStart : u*nLayers, :);
+        
+        % Cân bằng năng lượng cho từng UE
+        W_list{u} = W_ue / norm(W_ue, 'fro') * sqrt(1/numUE);
     end
+    % -----------------------------
 
     % Resource mapping and OFDM modulation
     numTxPorts = size(W_list{1}, 2); % Number of transmit antenna ports
