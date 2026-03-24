@@ -1,15 +1,4 @@
 function W = generateEnhancedTypeIIPrecoder(cfg, nLayers, i1, i2)
-    % cfg.CodeBookConfig = {
-    %     .CodebookType = 'typeII-r16' (hoặc 'typeII-PortSelection-r16'),
-    %     .N1 = [Giá trị nguyên],
-    %     .N2 = [Giá trị nguyên],
-    %     .ParamCombination = [1...8], % Xác định L, Beta, pv
-    %     .NumberOfPMISubbandsPerCQISubband = [1 hoặc 2], % Giá trị R
-    %     .TypeIIRIRestriction = [Bitmap],
-    %     .SubbandAmplitude = [true/false],
-    %     .PortSelectionSamplingSize = [1...4] % Chỉ dùng cho Port Selection
-    % };
-
     paramCombination = cfg.CodeBookConfig.ParamCombination;
     R = cfg.CodeBookConfig.NumberOfPMISubbandsPerCQISubband;
     N1 = cfg.CodeBookConfig.N1;
@@ -29,10 +18,10 @@ function W = generateEnhancedTypeIIPrecoder(cfg, nLayers, i1, i2)
     N3 = computeN3(R, numSubbands, bwpStart, bwpSize, subbandSize);
 
     % From table L, N1, N2, i12. Get parameters L, Pv, Beta
-    [L, Pv, Beta] = gettingParamsFromParamCombination(paramCombination, nLayers);
+    [L, Pv, ~] = gettingParamsFromParamCombination(paramCombination, nLayers);
 
     % Compute Mv = Number of Frequency Basis Vectors value
-    Mv = [Pv * N3/R];
+    Mv = Pv * N3/R;
 
     % Theory threadhold
     % K0 = Beta * 2*L * Mv;
@@ -47,13 +36,11 @@ function W = generateEnhancedTypeIIPrecoder(cfg, nLayers, i1, i2)
     MInitial = comptuteMInitial(N3, Mv, i15);
 
     % Compute n_f_3l (frequency domain basis indices for each l layers)
-    n_f_3l = ComputeNF3LFromI16(i16, N3, Mv, MInitial)
+    n_f_3l = ComputeNF3LFromI16(i16, N3, Mv, MInitial);
 
     [p_1_l, p_2_l] = computeP1lP2l(i23, i24);
 
     phi_lif = computePhaseCoefficient(i25);
-
-    y_tlf = computeRotatedDFTPhase(n_f_3l, 1, N3);
 
     % Assumme t = 1
     t = 1;
@@ -102,21 +89,6 @@ function W = generateEnhancedTypeIIPrecoder(cfg, nLayers, i1, i2)
 end
 
 function N3 = computeN3(R, numSubbands, nBWPStart, nBWPSize, subbandSize)
-% COMPUTEN3 Calculates the total number of precoding matrices (N3).
-%
-%   N3 = computeN3(R, numSubbands, nBWPStart, nBWPSize, subbandSize) calculates
-%   N3 based on the higher layer parameter R and the BWP configuration.
-%
-%   Inputs:
-%       R           : Number of PMI subbands per CQI subband (1 or 2) 
-%       numSubbands : Total number of subbands in the csi-ReportingBand
-%       nBWPStart   : The starting PRB index of the BWP (N_BWP_Start)
-%       nBWPSize    : The size of the BWP in PRBs (N_BWP_Size)
-%       subbandSize : The size of a subband in PRBs (e.g., 32)
-%
-%   Outputs:
-%       N3          : Total number of precoding matrices indicated by PMI
-
     if R == 1
         % When R = 1: One precoding matrix is indicated for each subband
         N3 = numSubbands;
@@ -191,50 +163,22 @@ function MInitial = comptuteMInitial(N3, Mv, i15)
     end
 end
 
-function validateInputs()
-
-end
-
 function [i11, i12, i15, i16, i17, i18, i23, i24, i25] = computeInputs(i1, i2, nLayers, N3, L, Mv)
-%COMPUTEINPUTS Giải nén báo cáo PMI cho Enhanced Type II Codebook
-%   Hàm này khôi phục đầy đủ các chỉ số từ dữ liệu thô (raw bits/indices) 
-%   dựa trên cơ chế nén của chuẩn 3GPP TS 38.214.
-%
-%   Inputs:
-%       i1, i2  : Cell arrays chứa dữ liệu thô từ Part 1 và Part 2
-%       nLayers : Số layer (Rank v)
-%       N3      : Tổng số subband (PMI subbands)
-%       L       : Số vector không gian (L)
-%       Mv      : Số vector tần số (M_v)
-%
-%   Outputs:
-%       i11, i12, i15, i16 : Các chỉ số cơ bản (giữ nguyên hoặc giải nén nhẹ)
-%       i17     : Bitmap [nLayers x 1] (Cell array)
-%       i18     : Chỉ thị hệ số mạnh nhất [nLayers x 1] (Cell array)
-%       i23     : Wideband Amplitude [nLayers x 2] (Đã khôi phục 2 phân cực)
-%       i24     : Subband Amplitude [nLayers x 2L x Mv] (Full matrix)
-%       i25     : Subband Phase [nLayers x 2L x Mv] (Full matrix)
-
-    % i1 thường chứa: {i11, i12, [i15], i16, i17, i18}
-    % Cấu trúc thay đổi tùy thuộc vào N3 (<=19 hoặc >19)    
     i11 = i1{1};
     i12 = i1{2};
     
     if N3 <= 19
-        % Khi N3 <= 19, i15 không được báo cáo (mặc định = 0)
         i15 = 0; 
         i16Reported = i1{3};
         i17Reported = i1{4};
         i18Reported = i1{5};
     else
-        % Khi N3 > 19, i15 (window parameter) được báo cáo
         i15 = i1{3};
         i16Reported = i1{4};
         i17Reported = i1{5};
         i18Reported = i1{6};
     end
 
-    % Đảm bảo định dạng Cell Array cho vòng lặp layer
     if ~iscell(i16Reported), i16Reported = num2cell(i16Reported, 2); end
     if ~iscell(i17Reported), i17Reported = num2cell(i17Reported, 2); end
     if ~iscell(i18Reported), i18Reported = num2cell(i18Reported, 2); end
@@ -243,8 +187,6 @@ function [i11, i12, i15, i16, i17, i18, i23, i24, i25] = computeInputs(i1, i2, n
     i17 = i17Reported;
     i18 = i18Reported;
 
-    % i2 chứa: {i23 (Compressed), i24 (Stream), i25 (Stream)}
-    
     i23Reported = i2{1};      % Wideband Amp: Chỉ báo 1 giá trị/layer (cho pol yếu)
     i24Reported = i2{2};      % Subband Amp: Stream các giá trị khác 0 (trừ strongest)
     i25Reported = i2{3};      % Phase: Stream các giá trị khác 0 (trừ strongest)
@@ -252,33 +194,26 @@ function [i11, i12, i15, i16, i17, i18, i23, i24, i25] = computeInputs(i1, i2, n
     if ~iscell(i23Reported), i23Reported = num2cell(i23Reported, 2); end
     if ~iscell(i24Reported), i24Reported = num2cell(i24Reported, 2); end
     if ~iscell(i25Reported), i25Reported = num2cell(i25Reported, 2); end
-
     
-    % Khởi tạo ma trận kết quả
     i24 = zeros(nLayers, 2*L, Mv);
     i25 = zeros(nLayers, 2*L, Mv);
     i23 = zeros(nLayers, 2); % [Layer, 2 Polarizations] - Cần khôi phục từ 1 giá trị
     
-    % Kiểm tra kích thước Bitmap
     bitmapLength = length(i17Reported{1});
     if bitmapLength ~= 2*L*Mv
         warning('Bitmap length (%d) does not match 2*L*Mv (%d)! Check configurations.', bitmapLength, 2*L*Mv);
     end
     
     for l = 1:nLayers
-        % Lấy dữ liệu của layer hiện tại
         bitmap_l = i17Reported{l};       
         i18_val = i18Reported{l};        
         vals_24 = i24Reported{l};        
         vals_25 = i25Reported{l};
         val_23_reported = i23Reported{l}; 
 
-        % === BƯỚC 1: XÁC ĐỊNH VỊ TRÍ HỆ SỐ MẠNH NHẤT (Strongest Coefficient) ===
         strongest_linear_idx = 0; % Index chạy từ 1 đến 2*L*Mv
         
         if nLayers == 1
-            % Với Rank = 1: i18 báo cáo thứ tự (index) của bit 1 trong bitmap
-            % Ví dụ: i18=2 nghĩa là hệ số khác không thứ 3 (0,1,2) là mạnh nhất.
             target_nz_count = i18_val + 1;
             current_nz_count = 0;
             for k = 1:bitmapLength
@@ -291,23 +226,13 @@ function [i11, i12, i15, i16, i17, i18, i23, i24, i25] = computeInputs(i1, i2, n
                 end
             end
         else
-            % Với Rank > 1: i18 báo cáo trực tiếp chỉ số không gian (Spatial Index i*)
-            % Do cơ chế Remap, hệ số mạnh nhất luôn nằm ở vector tần số đầu tiên (f=0).
-            % Trong Bitmap (xếp theo thứ tự f=0 -> Mv-1), khối đầu tiên tương ứng f=0.
             strongest_linear_idx = i18_val + 1; 
         end
         
-        % === BƯỚC 2: KHÔI PHỤC WIDEBAND AMPLITUDE (i23) ===
-        % Từ Linear Index, suy ra Spatial Index (0...2L-1)
-        % Linear Index = (f_idx-1)*2L + i_idx (MATLAB 1-based logic bên dưới)
-        % => (strongest_linear_idx - 1) % 2L
         strongest_spatial_idx = mod(strongest_linear_idx - 1, 2*L);
         
-        % Xác định phân cực của tia mạnh nhất (0 hoặc 1)
-        % 0 đến L-1: Pol 1; L đến 2L-1: Pol 2
         strongest_pol = floor(strongest_spatial_idx / L); 
         
-        % Quy tắc: Phân cực chứa tia mạnh nhất = Max (15), Phân cực kia = Giá trị báo cáo
         if strongest_pol == 0
             i23(l, 1) = 15;              % Pol 1 (chứa Strongest) -> Tự động Max
             i23(l, 2) = val_23_reported; % Pol 2 -> Lấy giá trị báo cáo
@@ -316,32 +241,22 @@ function [i11, i12, i15, i16, i17, i18, i23, i24, i25] = computeInputs(i1, i2, n
             i23(l, 2) = 15;              % Pol 2 (chứa Strongest) -> Tự động Max
         end
 
-        % === BƯỚC 3: KHÔI PHỤC SUBBAND AMPLITUDE (i24) VÀ PHASE (i25) ===
         stream_count = 1; 
         
-        % Duyệt qua toàn bộ Bitmap để điền vào ma trận 3D
-        % Thứ tự Bitmap: Quét hết các beam (i) cho f=0, sau đó f=1, ...
         for idx = 1:bitmapLength
-            % Mapping Linear Index -> Matrix Indices [Beam, Freq]
-            % Chú ý: MATLAB dùng 1-based indexing
             f_idx = floor((idx - 1) / (2*L)) + 1;  % Frequency index (1...Mv)
             i_idx = mod(idx - 1, 2*L) + 1;         % Beam index (1...2L)
 
             if bitmap_l(idx) == 1
                 if idx == strongest_linear_idx
-                    % Đây là hệ số mạnh nhất (Strongest Coefficient)
-                    % Không được báo cáo -> Tự động điền giá trị tham chiếu
                     i24(l, i_idx, f_idx) = 7; % Amplitude = 1 (index 7)
                     i25(l, i_idx, f_idx) = 0; % Phase = 0
                 else
-                    % Đây là hệ số thường (Weak/Non-strongest coefficient)
-                    % Lấy giá trị tiếp theo từ luồng dữ liệu báo cáo
                     if stream_count <= length(vals_24)
                         i24(l, i_idx, f_idx) = vals_24(stream_count);
                         i25(l, i_idx, f_idx) = vals_25(stream_count);
                         stream_count = stream_count + 1;
                     else
-                        % Safety check: Hết dữ liệu stream
                         i24(l, i_idx, f_idx) = 0; 
                         i25(l, i_idx, f_idx) = 0;
                     end
@@ -396,23 +311,11 @@ function [L, Pv, Beta] = gettingParamsFromParamCombination(paramCombination, nLa
 end
 
 function [m1, m2] = computeM1M2(n1, n2, q1, q2, O1, O2)
-% COMPUTEM1M2 Computes beam indices m1 and m2.
-%   Ref: 3GPP TS 38.214 Table 5.2.2.2.3-5.
-%
-%   Formula:
-%       m1^(i) = O1 * n1^(i) + q1  
-%       m2^(i) = O2 * n2^(i) + q2  
-
     m1 = O1 * n1 + q1;
     m2 = O2 * n2 + q2;
 end
 
 function [n1, n2] = computeN1N2(L, N1, N2, i12)
-% COMPUTEN1N2 Reconstructs n1 and n2 vectors from index i1,2.
-%   Implements the combinatorial coefficient decoding logic.
-%   Ref: 3GPP TS 38.214 Section 5.2.2.2.3.
-
-    % --- 1. Handle Special Cases where i1,2 is not reported ---
     if N2 == 1
         % Case: (N1,N2)=(2,1) -> i1,2 not reported 
         if N1 == 2
@@ -472,11 +375,6 @@ function isValid = checkConditionXStart(i12, s, x, y)
 end
 
 function val = getValFromCTable(x, y)
-% GETVALFROMCTABLE Returns Combinatorial Coefficient C(x,y).
-%   Ref: Table 5.2.2.2.3-1 
-
-    % Hardcoded table C(x,y)
-    % Rows correspond to x=0..15, Columns correspond to y=1..4
     C = [ ...
         0   0   0   0;    % x = 0
         1   0   0   0;    % x = 1
@@ -506,8 +404,6 @@ function val = getValFromCTable(x, y)
 end
 
 function n_f_3l = ComputeNF3LFromI16(i16, N3, Mv, MInitial)
-    % ComputeNF3LFromI16: Decodes the frequency domain basis indices n3,l.
-    
     if iscell(i16)
         i16 = cell2mat(i16); 
     end
@@ -546,7 +442,6 @@ function n_f_3l = ComputeNF3LFromI16(i16, N3, Mv, MInitial)
         end
     end
 
-    % Internal helper to find x* using the combinatorial table
     function x_star = findValidXStar(N3, Mv, f, i16l, S_value)
         % XÁC ĐỊNH GIỚI HẠN TÌM KIẾM DỰA TRÊN N3
         if N3 <= 19
@@ -613,16 +508,6 @@ end
 % end
 
 function [p_1_l, p_2_l] = computeP1lP2l(i23, i24)
-% COMPUTEP1LP2L Maps reported indices to physical amplitude values.
-%
-%   Inputs:
-%       i23 : Wideband amplitude indices (Layer x 2)
-%       i24 : Subband amplitude indices (Layer x 2L x Mv) [3D Matrix]
-%
-%   Outputs:
-%       p_1_l : Wideband amplitudes p^(1) (Layer x 2)
-%       p_2_l : Subband amplitudes p^(2) (Layer x 2L x Mv)
-
     function p_1_lp = mappingK1lpToP1lp(i23_input)
         % Note: k starts from 0, so MATLAB index = k + 1
         map_values = [
@@ -644,8 +529,6 @@ function [p_1_l, p_2_l] = computeP1lP2l(i23, i24)
             1                 % k=15
         ];
 
-        % Vectorized mapping: Map all elements at once preserving shape
-        % i23_input has indices 0-15. Add 1 for MATLAB indexing.
         p_1_lp = map_values(i23_input + 1);
         
         % Ensure output has same shape as input (Layer x 2)
@@ -665,8 +548,6 @@ function [p_1_l, p_2_l] = computeP1lP2l(i23, i24)
             1                 % k=7
         ];
 
-        % Vectorized mapping for 3D Matrix
-        % i24_input values are 0-7. Add 1 for MATLAB indexing.
         p_2_lif = map_values(i24_input + 1);
 
         % Ensure output has same shape as input [Layer, 2L, Mv]
@@ -679,19 +560,6 @@ function [p_1_l, p_2_l] = computeP1lP2l(i23, i24)
 end
 
 function phi_lif = computePhaseCoefficient(i25)
-    % COMPUTEPHASECOEFFICIENT Calculates the phase coefficients phi_l,i,f
-    % Formula: phi = exp(j * 2 * pi * c / 16)
-    %
-    % Input:
-    %   i25 : Phase indices (c_l,i,f) from reporting.
-    %         Structure: [Layer, 2L, Mv] (3D Matrix)
-    %
-    % Output:
-    %   phi_lif : Complex phase values.
-    %             Structure: [Layer, 2L, Mv] (Same as input)
-
-    % Sử dụng đúng tên biến đầu vào là i25
-    % Lưu ý: i25 chứa các giá trị nguyên từ 0 đến 15 (c_l,i,f)
     phi_lif = exp(1j * 2 * pi * i25 / 16);
 
 end
@@ -701,88 +569,37 @@ function y_tlf = computeRotatedDFTPhase(n_f_3l, N3, t)
 end
 
 function gama_tl = computeGamatl(L, Mv, p1lp, ytlf, l, p2lif, philif)
-    % COMPUTENORML2 Tính hệ số chuẩn hóa gamma_tl
-    % Chức năng: Tính tổng năng lượng để chuẩn hóa ma trận precoding.
-    %
-    % Input:
-    %   L, Mv    : Các tham số cấu hình Codebook
-    %   p1lp     : Biên độ băng rộng (Wideband Amplitude) [nLayers x 2]
-    %   ytlf     : Vector nén miền tần số (đã tính tại t) [nLayers x Mv]
-    %   l        : Chỉ số layer hiện tại đang tính (1-based)
-    %   p2lif    : Biên độ băng hẹp (Subband Amplitude) [nLayers x 2L x Mv]
-    %   philif   : Hệ số pha (Phase coefficients) [nLayers x 2L x Mv]
-
-    % =========================================================
-    % 1. CHUẨN BỊ DỮ LIỆU (DATA PREPARATION)
-    % =========================================================
-
-    % Lấy vector nén tần số y cho layer l (kích thước 1 x Mv)
     y_vec = ytlf(l, :); 
 
-    % Chuyển đổi ma trận biên độ (p2) và pha (phi) từ dạng 3D sang 2D 
-    % Kích thước mới: (2L hàng x Mv cột) để tiện nhân ma trận
     p2_mat = reshape(p2lif(l, :, :), 2*L, Mv);
     phi_mat = reshape(philif(l, :, :), 2*L, Mv);
 
-    % --- Xử lý dữ liệu thiếu (NaN Handling) ---
-    % Quy tắc: Các hệ số không được báo cáo (NaN) sẽ có giá trị bằng 0
     p2_mat(isnan(p2_mat)) = 0;   
     phi_mat(isnan(phi_mat)) = 0; 
     y_vec(isnan(y_vec)) = 0;     
 
-    % --- Chuẩn bị biên độ băng rộng (p1) ---
     p1_vals = p1lp(l, :);        
     p1_vals(isnan(p1_vals)) = 0; % Xử lý NaN cho p1 nếu có
 
-    % Tạo vector p1_vec kích thước (2L x 1) khớp với số lượng beam
-    % L dòng đầu tiên dùng giá trị p1 của phân cực 1
-    % L dòng tiếp theo dùng giá trị p1 của phân cực 2
     p1_vec = [repmat(p1_vals(1), L, 1);
               repmat(p1_vals(2), L, 1)];
 
-    % =========================================================
-    % 2. TÍNH TOÁN (CORE CALCULATION)
-    % =========================================================
-
-    % --- BƯỚC A: Tính tổ hợp miền tần số (Inner Sum) ---
-    % Nhân element-wise: (Biên độ Subband * Pha * Vector nén tần số)
-    % y_vec sẽ tự động nhân vào từng hàng của ma trận
     term_matrix = p2_mat .* phi_mat .* y_vec;
 
-    % Cộng dồn theo chiều tần số (chiều ngang)
-    % Kết quả là vector cột (2L x 1) chứa hệ số phức tổng hợp cho từng beam
     inner_sum = sum(term_matrix, 2); 
 
-    % --- BƯỚC B: Tính năng lượng (Outer Sum preparation) ---
-    % Tính bình phương độ lớn của tổ hợp tần số
     freq_power_sq = abs(inner_sum) .^ 2;
 
-    % Nhân với bình phương biên độ băng rộng (p1)
     energy_terms = (p1_vec .^ 2) .* freq_power_sq;
 
-    % --- BƯỚC C: Tổng hợp kết quả ---
-    % Cộng tổng năng lượng của tất cả các beam không gian
     gama_tl = sum(energy_terms);
 
-    % Kiểm tra an toàn cuối cùng (trả về 0 thay vì NaN nếu dữ liệu rỗng)
     if isnan(gama_tl)
         gama_tl = 0; 
     end
 end
 
 function v = computeBeam(l, m, N1, N2, O1, O2, phaseFactor)
-% COMPUTEBEAM Generates the DFT beam vector v_lm.
-%   Based on 3GPP TS 38.214 Section 5.2.2.2.3.
-%   v_lm is constructed as the Kronecker product of u_n1 and u_n2.
-%
-% INPUTS:
-%   l, m        : Beam indices (corresponds to m1 and m2 in the standard).
-%   N1, N2      : Number of antenna ports in each dimension.
-%   O1, O2      : Oversampling factors.
-%   phaseFactor : Usually 2 for 2*pi in DFT exponent.
-
-    % 1. Compute DFT vector for dimension 2 (Horizontal)
-    % Ref: u_m in Eq for v_lm [cite: 311]
     if N2 == 1
         u_n2 = 1; % 1D array case
     else 
@@ -791,14 +608,9 @@ function v = computeBeam(l, m, N1, N2, O1, O2, phaseFactor)
         u_n2 = exp(1j * phaseFactor * pi * m * n2 / (O2 * N2));
     end
     
-    % 2. Compute DFT vector for dimension 1 (Vertical)
     n1 = (0:N1-1).';
-    % Exp: j * 2pi * l * n1 / (O1 * N1)
     u_n1 = exp(1j * phaseFactor * pi * l * n1 / (O1 * N1));
   
-    % 3. Construct 2D Beam via Kronecker Product
-    % v_lm = u_n1 (kron) u_n2 [cite: 311]
-    % Note: This ordering assumes n2 is the fastest changing index in port mapping.
     v = kron(u_n1, u_n2);
     v = v(:); % Ensure column vector
 end

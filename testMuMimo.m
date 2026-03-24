@@ -2,40 +2,41 @@ clear; clc; close all;
 
 setupPath();
 
-PMIUE1.i1 = { [3 0], 0, [3 2], [6,3,5,7;4,6,7,7] };
-PMIUE1.i2 = { [1,1,2,0;2,3,0,0], [1,1,1,1;1,1,1,1] };
-
-PMIUE2.i1 = { [3 0], 5, [3 0], [5,4,5,7;7,4,1,6] };
-PMIUE2.i2 = { [2,0,3,0;0,2,1,0], [1,1,1,1;1,1,1,1] };
-
 MCS = 12;
-nLayers = 2;
+nLayers = 4;
 
-cfg = struct();
-cfg.CodebookConfig.N1 = 4; 
-cfg.CodebookConfig.N2 = 1;
-cfg.CodebookConfig.O1 = 4;
-cfg.CodebookConfig.O2 = 1;
-cfg.CodebookConfig.NumberOfBeams = 2;      
-cfg.CodebookConfig.PhaseAlphabetSize = 4; 
-cfg.CodebookConfig.SubbandAmplitude = true;
-cfg.CodebookConfig.numLayers = nLayers;   
+% W1 = [
+%     0.4000 - 0.1000i   0.6396 + 0.0000i;
+%   -0.4000 - 0.1000i   0.2132 + 0.0000i;
+%    0.0000 + 0.2828i   0.0000 + 0.1508i;
+%   -0.0000 - 0.2828i  -0.0000 - 0.1508i;
+% ];
 
-W1 = generateTypeIIPrecoder(cfg, PMIUE1.i1, PMIUE1.i2, true);
-W2 = generateTypeIIPrecoder(cfg, PMIUE2.i1, PMIUE2.i2, true);
 
-if nLayers == 2
-    THREAD_HOLD = 1e-15;
-elseif nLayers == 3
-    THREAD_HOLD = 1e-2;
-else
-    THREAD_HOLD = 1e-2;
-end
+% W2 = [
+%     -0.1499 + 0.0530i  -0.2512 + 0.0000i;
+%    0.1499 + 0.0530i   0.1954 - 0.0000i;
+%    0.4240 + 0.2120i   0.3157 + 0.3157i;
+%    0.4240 - 0.2120i   0.3157 - 0.3157i;
+% ];
 
-BER_THREAD_HOLD = 10e-9;
+W1 = [
+    0.0202 + 0.0093i  -0.0009 - 0.0178i   0.0202 + 0.0248i   0.0090 - 0.0318i;
+   -0.0079 + 0.0053i  -0.0161 + 0.0100i   0.0170 - 0.0532i   0.0051 + 0.0202i;
+    0.4037 - 0.1570i   0.3281 - 0.2936i   0.3908 + 0.0731i   0.2605 - 0.3098i;
+    0.2296 - 0.0951i   0.2235 - 0.0743i   0.2924 + 0.0485i   0.2175 - 0.1932i
+];
+
+W2 = [
+   0.2321 - 0.3309i   0.3774 + 0.1391i   0.4134 - 0.0309i   0.1292 - 0.0777i;
+   0.0583 + 0.2800i   0.2942 + 0.0220i  -0.1680 + 0.2178i   0.0313 - 0.4716i;
+   0.0239 - 0.0324i   0.0125 - 0.0317i   0.0006 - 0.0337i   0.0464 - 0.0228i;
+   0.0525 + 0.0216i   0.0068 + 0.0031i   0.0362 + 0.0050i  -0.0274 - 0.0224i
+];
 
 pdsch = customPDSCHConfig;
 pdsch.DMRS.DMRSConfigurationType = 1;
+pdsch.DMRS.DMRSLength = 2; % <--- THÊM DÒNG NÀY (Double Symbol DMRS)
 pdsch.DMRS.DMRSAdditionalPosition = 1;
 pdsch.NumLayers = nLayers;
 pdsch.PRBSet = 0:272;
@@ -47,7 +48,7 @@ carrier.NSizeGrid = 273;
 
 [BER1, BER2] = muMimo(...
     carrier, pdsch, ...
-    W1, W2, MCS, 20 ...
+    W1, W2, MCS, 30 ...
 );
 
 disp(BER1);
@@ -63,7 +64,7 @@ function [BER1, BER2] = muMimo(...
     % -----------------------------------------------------------------
     pdsch = basePDSCHConfig; 
 
-    pdsch.DMRS.DMRSPortSet = [0, 1]; 
+    pdsch.DMRS.DMRSPortSet = [0, 1, 2, 3]; 
     pdsch = pdsch.setMCS(MCS);
 
     [~, pdschInfo] = nrPDSCHIndices(carrier, pdsch);
@@ -78,7 +79,7 @@ function [BER1, BER2] = muMimo(...
     % UE2 Configuration
     % -----------------------------------------------------------------
     pdsch2 = pdsch; 
-    pdsch2.DMRS.DMRSPortSet = [2, 3]; 
+    pdsch2.DMRS.DMRSPortSet = [4, 5, 6, 7]; 
     pdsch2 = pdsch2.setMCS(MCS);
 
     [~, pdschInfo] = nrPDSCHIndices(carrier, pdsch2);
@@ -143,8 +144,11 @@ function [BER1, BER2] = muMimo(...
     % -----------------------------------------------------------------
     % Channel
     % -----------------------------------------------------------------
-    rxWaveformUE1 = txWaveform;
-    rxWaveformUE2 = txWaveform;
+    rxWaveformUE1_clean = txWaveform * UE1_W; 
+    rxWaveformUE2_clean = txWaveform * UE2_W;
+
+    rxWaveformUE1 = awgn(rxWaveformUE1_clean, SNR_dB, 'measured');
+    rxWaveformUE2 = awgn(rxWaveformUE2_clean, SNR_dB, 'measured');
 
     % -----------------------------------------------------------------
     % RX
@@ -165,5 +169,83 @@ function [BER1, BER2] = muMimo(...
     rxBits2 = rxPDSCHDecode(carrier, pdsch2, rxWaveformUE2, txWaveform, TBS2);
 
     numErrors2 = biterr(double(inputBits2), double(rxBits2));
-    BER2 = numErrors2 / TBS;
+    BER2 = numErrors2 / TBS2;
+end
+
+function rxBits = rxPDSCHDecode(carrier, pdsch, rxWaveform, txWaveform, TBS)
+    pdschInd = nrPDSCHIndices(carrier, pdsch);
+
+    dmrsSym = nrPDSCHDMRS(carrier, pdsch);
+    dmrsInd = nrPDSCHDMRSIndices(carrier, pdsch);
+
+    % LÝ THUYẾT: Kênh truyền ma trận không có độ trễ lan truyền. 
+    % Buộc offset = 0 để tránh nhiễu tương quan làm trượt cửa sổ FFT.
+    offset = 0; 
+
+    rxWaveformSync = rxWaveform(1+offset:end, :);
+
+    samplesNeeded = length(txWaveform); 
+
+    if size(rxWaveformSync, 1) < samplesNeeded
+        padding = samplesNeeded - size(rxWaveformSync, 1);
+        rxWaveformSync = [rxWaveformSync; zeros(padding, size(rxWaveformSync, 2))];
+    end
+
+    rxGrid = nrOFDMDemodulate(carrier, rxWaveformSync);
+    rxGrid = rxGrid(1:carrier.NSizeGrid*12, 1:carrier.SymbolsPerSlot, :);
+
+    [Hest, nVar] = nrChannelEstimate(carrier, rxGrid, dmrsInd, dmrsSym, ...
+        'CDMLengths', pdsch.DMRS.CDMLengths, ... 
+        'AveragingWindow', [1 1]);
+
+    [pdschRx, pdschHest] = nrExtractResources(pdschInd, rxGrid, Hest);
+    eqSymbols = nrEqualizeMMSE(pdschRx, pdschHest, nVar);
+
+    % LÝ THUYẾT: Truyền phương sai nhiễu nVar thực tế từ kênh vào khối giải mã
+    rxBits = PDSCHDecode(pdsch, carrier, eqSymbols, TBS, nVar);
+end
+
+% -----------------------------------------------------------------
+% This function performs the full PDSCH decoding chain
+% -----------------------------------------------------------------
+function [out, hasError] = PDSCHDecode(pdsch, carrier, eqSymbols, TBS, nVar)
+
+    % -----------------------------------------------------------------
+    % DEMODULATION & DESCRAMBLING
+    % -----------------------------------------------------------------
+    demappedSym_Cell = nrLayerDemap(eqSymbols);
+    sym_to_demod = demappedSym_Cell{1}; 
+
+    % LÝ THUYẾT: Sử dụng trực tiếp nVar để tính LLR chuẩn xác
+    rawLLR = nrSymbolDemodulate(sym_to_demod, pdsch.Modulation, nVar);
+
+    if isempty(pdsch.NID)
+        nid = carrier.NCellID; 
+    else
+        nid = pdsch.NID(1); 
+    end
+    
+    c_seq_rx = nrPDSCHPRBS(nid, pdsch.RNTI, 0, length(rawLLR));
+    descrambledBits = rawLLR .* (1 - 2*double(c_seq_rx));
+
+    % -----------------------------------------------------------------
+    % RATE RECOVERY
+    % -----------------------------------------------------------------
+    rv = 0; 
+    raterecovered = nrRateRecoverLDPC(descrambledBits, TBS, pdsch.TargetCodeRate, ...
+                                      rv, pdsch.Modulation, pdsch.NumLayers);
+
+    % -----------------------------------------------------------------
+    % DECODING CHAIN (LDPC & CRC)
+    % -----------------------------------------------------------------
+    crcEnc_dummy = zeros(TBS + 24, 1); 
+    bgn_rx = baseGraphSelection(crcEnc_dummy, pdsch.TargetCodeRate);
+
+    MAX_ITER = 25;
+    [decBits, ~] = nrLDPCDecode(raterecovered, bgn_rx, MAX_ITER, ...
+                        'Algorithm', 'Normalized min-sum', ...
+                        'ScalingFactor', 0.75);
+
+    [rxPart, ~] = nrCodeBlockDesegmentLDPC(decBits, bgn_rx, TBS + 24);
+    [out, hasError] = nrCRCDecode(rxPart, '24A');
 end

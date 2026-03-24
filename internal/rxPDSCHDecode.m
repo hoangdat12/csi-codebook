@@ -1,6 +1,5 @@
 function rxBits = rxPDSCHDecode(carrier, pdsch, rxWaveform, txWaveform, TBS)
     pdschInd = nrPDSCHIndices(carrier, pdsch);
-    refGrid = nrResourceGrid(carrier, pdsch.NumLayers);
 
     dmrsSym = nrPDSCHDMRS(carrier, pdsch);
     dmrsInd = nrPDSCHDMRSIndices(carrier, pdsch);

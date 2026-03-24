@@ -50,21 +50,9 @@ phyConfig.NSizeGrid         = 273;
 % 5. Run scheduling comparison across group sizes 2 to 12
 % =========================================================================
 maxIter    = 100;
-groupSizes = 2:16;
+groupSizes = 2:12;
 
 final_results = runSchedulingComparison(W_pool, phyConfig, groupSizes, maxIter);
-
-% =========================================================================
-% 6. Define K-Means scenarios for impact evaluation
-% Each row: [numClusters, targetPoolSize]
-% =========================================================================
-my_kmeans_scenarios = [
-     50,  200;
-    100,  500;
-    200,  500;
-    200, 1000;
-    500, 2000
-];
 
 % =========================================================================
 % LOCAL FUNCTIONS 

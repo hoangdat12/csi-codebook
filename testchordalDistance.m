@@ -6,7 +6,7 @@ setupPath();
 % Configuration Parameters
 % -----------------------------------------------------------------
 nLayers = 2;
-nTxAnts = 8;                
+nTxAnts = 4;                
 nRxAnts = 4;                 
 sampleRate = 61440000;  
 SNR_dB = 20;

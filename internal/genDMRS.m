@@ -98,6 +98,7 @@ function dmrs_values = genDMRS(carrier, pdsch, enabledR16)
             
             % Multiply base sequence by OCC and store in respective layer column
             dmrs_values(startIndex:endIndex, layerIdx) = complex_symbol_vector .* wf_pattern .* wt .* scale_factor;
+            %  dmrs_values(startIndex:endIndex, layerIdx) = complex_symbol_vector .* wf_pattern .* wt;
         end
     end
 end
@@ -129,6 +130,8 @@ function c_init = generateCInit(dmrs, carrier, dmrssymbols, enabledR16)
     % -----------------------------------------------------------
     raw_nSCID = dmrs.NSCID;
     lambda = dmrs.CDMGroups(1); 
+
+    disp(lambda);
     
     % Special handling for Rel-16 w/ Lambda=1
     if enabledR16 && (lambda == 1)

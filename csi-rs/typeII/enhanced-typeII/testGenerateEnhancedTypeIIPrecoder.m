@@ -1,3 +1,5 @@
+clear; clc;
+
 % % % --- 1. CẤU HÌNH THAM SỐ CƠ BẢN ---
 % % nLayers = 4;
 % % L = 4;
@@ -84,128 +86,84 @@
 
 % % % --- 5. HIỂN THỊ KẾT QUẢ ĐỂ KIỂM TRA ---
 
-% clear; clc;
+clear; clc;
 
-% %% 1. Cấu hình (Configuration)
-% nLayers = 4; % Rank = 4
+nLayers = 4; % Rank = 4
 
-% % Cấu hình Codebook (ParamCombination = 4 -> L=4, Beta=1/2)
-% cfg.CodeBookConfig.CodebookType = 'typeII-r16';
-% cfg.CodeBookConfig.N1 = 4;
-% cfg.CodeBookConfig.N2 = 4; 
-% cfg.CodeBookConfig.ParamCombination = 4; 
-% cfg.CodeBookConfig.NumberOfPMISubbandsPerCQISubband = 1; % R = 1
-% cfg.CodeBookConfig.TypeIIRIRestriction = []; 
-% cfg.CodeBookConfig.SubbandAmplitude = true;
-% cfg.CodebookConfig.O1 = 4;
-% cfg.CodebookConfig.O2 = 4;
-
-% % Cấu hình Grid (Để ra N3 = 32)
-% cfg.CSIReportConfig.SubbandSize = 4; 
-% cfg.CarrierConfig.NStartGrid = 0;
-% cfg.CarrierConfig.NSizeGrid = 128; 
-
-% %% 2. Tạo i1 (Part 1)
-% % N3 = 32, L = 4, Mv = 4 -> Bitmap Length = 32
-% bitmap_len = 32;
-
-% % i1{1}: q1, q2 (Chỉ có 2 giá trị)
-% i1{1} = [1, 2]; 
-
-% % i1{2}: i12 (Spatial index)
-% i1{2} = 0; 
-
-% % i1{3}: i15 (M_initial - window start)
-% i1{3} = 0; 
-
-% % i1{4}: i16 (Frequency basis indices - Combinatorial)
-% i1{4} = randi([0, 34], nLayers, 1); %
-
-% % i1{5}: i17 (Bitmap)
-% i1_7_cell = cell(nLayers, 1);
-% num_nz_per_layer = zeros(nLayers, 1);
-% rng(42); % Seed cố định
-% for l = 1:nLayers
-%     bits = zeros(1, bitmap_len);
-%     perm = randperm(bitmap_len, 8); % Random 8 bit 1
-%     bits(perm) = 1;
-%     i1_7_cell{l} = bits;
-%     num_nz_per_layer(l) = sum(bits);
-% end
-% i1{5} = i1_7_cell;
-
-% % i1{6}: i18 (Strongest coefficient indicator)
-% i1_8_cell = cell(nLayers, 1);
-% for l = 1:nLayers
-%     i1_8_cell{l} = randi([0, 7]); % Random beam index 0-7
-% end
-% i1{6} = i1_8_cell;
-
-% %% 3. Tạo i2 (Part 2)
-% % i2{1}: i23 (Wideband Amp - p1)
-% i2{1} = randi([1, 15], nLayers, 2); 
-
-% % i2{2} (Subband Amp) & i2{3} (Phase)
-% i2_4_cell = cell(nLayers, 1);
-% i2_5_cell = cell(nLayers, 1);
-
-% for l = 1:nLayers
-%     % Stream length = Số bit 1 trong bitmap trừ đi 1 (strongest)
-%     stream_len = max(0, num_nz_per_layer(l) - 1);
-    
-%     i2_4_cell{l} = randi([0, 7], 1, stream_len);  
-%     i2_5_cell{l} = randi([0, 15], 1, stream_len); 
-% end
-
-% i2{2} = i2_4_cell;
-% i2{3} = i2_5_cell;
-
-% W = generateEnhancedTypeIIPrecoder(cfg, nLayers, i1, i2);
-% disp(W);
-
-%% Case 2
-% 1. Cấu hình (Configuration)
-nLayers = 1;
-
-%Cấu hình Codebook (ParamCombination = 4 -> L=4, Beta=1/2)
+% Cấu hình Codebook cho 4 Port (P_CSI-RS = 2 * N1 * N2 = 4)
 cfg.CodeBookConfig.CodebookType = 'typeII-r16';
-cfg.CodeBookConfig.N1 = 4;
-cfg.CodeBookConfig.N2 = 2; 
-cfg.CodeBookConfig.ParamCombination = 4; 
-cfg.CodeBookConfig.NumberOfPMISubbandsPerCQISubband = 1; % R = 2
+cfg.CodeBookConfig.N1 = 2;
+cfg.CodeBookConfig.N2 = 1; 
+
+% Bắt buộc paramCombination = 1 hoặc 2 khi cấu hình 4 Port
+cfg.CodeBookConfig.ParamCombination = 2; % L=2, Beta=1/2, pv=1/8 (cho 4 layer)
+cfg.CodeBookConfig.NumberOfPMISubbandsPerCQISubband = 1; % R = 1
 cfg.CodeBookConfig.TypeIIRIRestriction = []; 
 cfg.CodeBookConfig.SubbandAmplitude = true;
+
+% O1, O2 tương ứng cho N1=2, N2=1
 cfg.CodebookConfig.O1 = 4;
-cfg.CodebookConfig.O2 = 4;
+cfg.CodebookConfig.O2 = 1;
 
 % Cấu hình Grid (Để ra N3 = 32)
-cfg.CSIReportConfig.SubbandSize = 8; 
+cfg.CSIReportConfig.SubbandSize = 4; 
 cfg.CarrierConfig.NStartGrid = 0;
 cfg.CarrierConfig.NSizeGrid = 128; 
 
-N3 = 16; Mv = 4; L = 4;
+PMI = randomTypeIIEnhancedPMI(cfg, nLayers);
 
-% Dữ liệu Part 1
-i11 = [1, 2]; 
-i12 = 5; 
-i15 = 0; 
-i16 = [4];
+% Test chạy hàm
+W = generateEnhancedTypeIIPrecoder(cfg, nLayers, PMI.i1, PMI.i2);
+disp('Khởi tạo thành công! Kích thước ma trận W:');
+disp(W);
 
-bitmap_vec = [0 0 0 1 0 0 0 0, 0 0 0 0 0 0 0 0, 1 1 0 0 0 0 0 0, 0 0 0 0 0 0 1 0];
-i17 = {bitmap_vec};              
+% %% Case 2
+% % 1. Cấu hình (Configuration)
 
-i18 = {[0]}; 
+% nLayers = 4;
 
-i23 = {[3]};          
-i24 = {[3, 2, 4]};   
-i25 = {[1, 9, 11]};  
+% %Cấu hình Codebook (ParamCombination = 4 -> L=4, Beta=1/2)
+% cfg.CodeBookConfig.CodebookType = 'typeII-r16';
+% cfg.CodeBookConfig.N1 = 2;
+% cfg.CodeBookConfig.N2 = 1; 
+% cfg.CodeBookConfig.ParamCombination = 1; 
+% cfg.CodeBookConfig.NumberOfPMISubbandsPerCQISubband = 1; % R = 2
+% cfg.CodeBookConfig.TypeIIRIRestriction = []; 
+% cfg.CodeBookConfig.SubbandAmplitude = true;
+% cfg.CodebookConfig.O1 = 4;
+% cfg.CodebookConfig.O2 = 1;
 
-if N3 <= 19
-    i1 = {i11, i12, i16, i17, i18}; 
-else
-    i1 = {i11, i12, i15, i16, i17, i18}; 
-end
+% cfg.CSIReportConfig.SubbandSize = 8; 
+% cfg.CarrierConfig.NStartGrid = 0;
+% cfg.CarrierConfig.NSizeGrid = 128; 
 
-% [i11, i12, i15, i16, i17, i18, i23, i24, i25] = computeInputs(i1, i2, nLayers, N3, L, Mv)
+% PMI = randomTypeIIEnhancedPMI(cfg, 4);
+% disp(PMI);
 
-W = generateEnhancedTypeIIPrecoder(cfg, nLayers, i1, i2)
+% W = generateEnhancedTypeIIPrecoder(cfg, nLayers, PMI.i1, PMI.i2);
+
+% i11 = [1, 2]; 
+% i12 = 5; 
+% i15 = 0; 
+% i16 = 4;
+
+% bitmap_vec = [0 0 0 1 0 0 0 0, 0 0 0 0 0 0 0 0, 1 1 0 0 0 0 0 0, 0 0 0 0 0 0 1 0];
+% i17 = {bitmap_vec};              
+
+% i18 = {0}; 
+
+% i23 = {3};          
+% i24 = {[3, 2, 4]};   
+% i25 = {[1, 9, 11]};  
+
+% if N3 <= 19
+%     i1 = {i11, i12, i16, i17, i18}; 
+% else
+%     i1 = {i11, i12, i15, i16, i17, i18}; 
+% end
+
+% i2 = {i23, i24, i25};
+
+% % [i11, i12, i15, i16, i17, i18, i23, i24, i25] = computeInputs(i1, i2, nLayers, N3, L, Mv)
+
+% W = generateEnhancedTypeIIPrecoder(cfg, nLayers, PMI.i1, PMI.i2);

@@ -161,99 +161,99 @@ for caseIdx = 1:length(ALL_Case)
     savevsarecordingmulti(ALL_Case(caseIdx).FILE_NAME, data_repeat, NFFT*scs, centerFreq, nchannel);
 
 
-    % exportFileName = 'PDSCH_4P1V_TypeI_PMI30_ExportData.mat'; 
+    exportFileName = 'PDSCH_4P2V_TypeII_ExportData.mat'; 
 
-    % fprintf('\n======================================================\n');
-    % fprintf(' BẮT ĐẦU SO SÁNH CHI TIẾT RESOURCE GRID \n');
-    % fprintf('======================================================\n');
+    fprintf('\n======================================================\n');
+    fprintf(' BẮT ĐẦU SO SÁNH CHI TIẾT RESOURCE GRID \n');
+    fprintf('======================================================\n');
 
-    % % 1. Load dữ liệu từ Code 1
-    % if exist(exportFileName, 'file')
-    %     data_code1 = load(exportFileName);
-    % else
-    %     error('Không tìm thấy file %s. Hãy chắc chắn bạn đã chạy Code 1.', exportFileName);
-    % end
+    % 1. Load dữ liệu từ Code 1
+    if exist(exportFileName, 'file')
+        data_code1 = load(exportFileName);
+    else
+        error('Không tìm thấy file %s. Hãy chắc chắn bạn đã chạy Code 1.', exportFileName);
+    end
 
-    % RG_code1 = data_code1.RG;
+    RG_code1 = data_code1.RG;
 
-    % % 2. Xử lý Resource Grid tại Slot 0
-    % numSubcarriers = 3276; % 273 PRB * 12
-    % numSymbols = 14;
-    % numRE_per_Slot = numSubcarriers * numSymbols; 
-    % numPorts = 4;
+    % 2. Xử lý Resource Grid tại Slot 0
+    numSubcarriers = 3276; % 273 PRB * 12
+    numSymbols = 14;
+    numRE_per_Slot = numSubcarriers * numSymbols; 
+    numPorts = 4;
 
-    % % Lấy Data Grid Slot 0 của Code 1 (Kích thước: 45864 x 4)
-    % grid1_slot0 = RG_code1(1:numRE_per_Slot, :); 
+    % Lấy Data Grid Slot 0 của Code 1 (Kích thước: 45864 x 4)
+    grid1_slot0 = RG_code1(1:numRE_per_Slot, :); 
 
-    % % Lấy Data Grid Slot 0 của Code 2 (Kích thước: 3276 x 14 x 4)
-    % grid2_slot0 = frameGrid(:, 1:14, :); 
-    % % Reshape Code 2 về [45864 x 4] để map 1-1 với Code 1
-    % grid2_slot0_reshaped = reshape(grid2_slot0, numRE_per_Slot, numPorts);
+    % Lấy Data Grid Slot 0 của Code 2 (Kích thước: 3276 x 14 x 4)
+    grid2_slot0 = frameGrid(:, 1:14, :); 
+    % Reshape Code 2 về [45864 x 4] để map 1-1 với Code 1
+    grid2_slot0_reshaped = reshape(grid2_slot0, numRE_per_Slot, numPorts);
 
-    % % 3. Tìm các vị trí lệch nhau
-    % threshold = 1e-5; % Ngưỡng sai số (bỏ qua sai số do làm tròn dấu phẩy động của MATLAB)
-    % diff_Grid = abs(grid1_slot0 - grid2_slot0_reshaped);
+    % 3. Tìm các vị trí lệch nhau
+    threshold = 1e-5; % Ngưỡng sai số (bỏ qua sai số do làm tròn dấu phẩy động của MATLAB)
+    diff_Grid = abs(grid1_slot0 - grid2_slot0_reshaped);
 
-    % % Tìm linear index của các điểm bị lệch
-    % [err_rows, err_ports] = find(diff_Grid > threshold);
+    % Tìm linear index của các điểm bị lệch
+    [err_rows, err_ports] = find(diff_Grid > threshold);
 
-    % if isempty(err_rows)
-    %     fprintf('\n=> TUYỆT VỜI! KẾT QUẢ KHỚP NHAU 100%% TẠI MỌI VỊ TRÍ RE.\n');
-    % else
-    %     total_errors = length(err_rows);
-    %     fprintf('\n=> PHÁT HIỆN %d VỊ TRÍ CÓ SAI LỆCH GIỮA 2 CODE!\n\n', total_errors);
+    if isempty(err_rows)
+        fprintf('\n=> TUYỆT VỜI! KẾT QUẢ KHỚP NHAU 100%% TẠI MỌI VỊ TRÍ RE.\n');
+    else
+        total_errors = length(err_rows);
+        fprintf('\n=> PHÁT HIỆN %d VỊ TRÍ CÓ SAI LỆCH GIỮA 2 CODE!\n\n', total_errors);
         
-    %     % --- CHUYỂN ĐỔI LINEAR INDEX SANG TỌA ĐỘ (SUBCARRIER, SYMBOL) ---
-    %     % Vì reshape hoạt động theo cột (Subcarrier chạy hết rồi mới tới Symbol)
-    %     err_subcarriers = mod(err_rows - 1, numSubcarriers) + 1;
-    %     err_symbols = floor((err_rows - 1) / numSubcarriers) + 1;
+        % --- CHUYỂN ĐỔI LINEAR INDEX SANG TỌA ĐỘ (SUBCARRIER, SYMBOL) ---
+        % Vì reshape hoạt động theo cột (Subcarrier chạy hết rồi mới tới Symbol)
+        err_subcarriers = mod(err_rows - 1, numSubcarriers) + 1;
+        err_symbols = floor((err_rows - 1) / numSubcarriers) + 1;
         
-    %     % --- THỐNG KÊ LỖI THEO SYMBOL ---
-    %     % Điều này rất quan trọng để biết lỗi do DMRS hay do Data
-    %     fprintf('--- THỐNG KÊ LỖI THEO OFDM SYMBOL ---\n');
-    %     unique_symbols = unique(err_symbols);
-    %     for i = 1:length(unique_symbols)
-    %         sym = unique_symbols(i);
-    %         count_per_sym = sum(err_symbols == sym);
+        % --- THỐNG KÊ LỖI THEO SYMBOL ---
+        % Điều này rất quan trọng để biết lỗi do DMRS hay do Data
+        fprintf('--- THỐNG KÊ LỖI THEO OFDM SYMBOL ---\n');
+        unique_symbols = unique(err_symbols);
+        for i = 1:length(unique_symbols)
+            sym = unique_symbols(i);
+            count_per_sym = sum(err_symbols == sym);
             
-    %         % Gợi ý loại tín hiệu (Symbol 3 trong cấu hình Type A Pos 2 thường là DMRS)
-    %         if sym == 3 || sym == 12 % Tùy thuộc vào additional position
-    %             sig_type = 'Rất có thể là DMRS (hoặc PTRS)';
-    %         else
-    %             sig_type = 'Rất có thể là PDSCH Data';
-    %         end
-    %         fprintf(' - Symbol %2d : %6d lỗi (%s)\n', sym, count_per_sym, sig_type);
-    %     end
+            % Gợi ý loại tín hiệu (Symbol 3 trong cấu hình Type A Pos 2 thường là DMRS)
+            if sym == 3 || sym == 12 % Tùy thuộc vào additional position
+                sig_type = 'Rất có thể là DMRS (hoặc PTRS)';
+            else
+                sig_type = 'Rất có thể là PDSCH Data';
+            end
+            fprintf(' - Symbol %2d : %6d lỗi (%s)\n', sym, count_per_sym, sig_type);
+        end
         
-    %     % --- IN RA 15 VỊ TRÍ LỖI ĐẦU TIÊN ĐỂ SOI CHI TIẾT ---
-    %     fprintf('\n--- CHI TIẾT 15 VỊ TRÍ LỆCH ĐẦU TIÊN ---\n');
-    %     fprintf('%-6s | %-12s | %-8s | %-6s | %-20s | %-20s | %-12s\n', ...
-    %             'STT', 'Subcarrier', 'Symbol', 'Port', 'Giá trị Code 1', 'Giá trị Code 2', 'Độ lệch (Abs)');
-    %     fprintf(repmat('-', 1, 100));
-    %     fprintf('\n');
+        % --- IN RA 15 VỊ TRÍ LỖI ĐẦU TIÊN ĐỂ SOI CHI TIẾT ---
+        fprintf('\n--- CHI TIẾT 15 VỊ TRÍ LỆCH ĐẦU TIÊN ---\n');
+        fprintf('%-6s | %-12s | %-8s | %-6s | %-20s | %-20s | %-12s\n', ...
+                'STT', 'Subcarrier', 'Symbol', 'Port', 'Giá trị Code 1', 'Giá trị Code 2', 'Độ lệch (Abs)');
+        fprintf(repmat('-', 1, 100));
+        fprintf('\n');
         
-    %     num_display = min(15, total_errors);
-    %     for k = 1:num_display
-    %         r = err_rows(k);
-    %         p = err_ports(k);
-    %         sub_c = err_subcarriers(k);
-    %         sym_b = err_symbols(k);
+        num_display = min(15, total_errors);
+        for k = 1:num_display
+            r = err_rows(k);
+            p = err_ports(k);
+            sub_c = err_subcarriers(k);
+            sym_b = err_symbols(k);
             
-    %         val1 = grid1_slot0(r, p);
-    %         val2 = grid2_slot0_reshaped(r, p);
-    %         diff_val = diff_Grid(r, p);
+            val1 = grid1_slot0(r, p);
+            val2 = grid2_slot0_reshaped(r, p);
+            diff_val = diff_Grid(r, p);
             
-    %         % Format số phức để in ra màn hình
-    %         str_val1 = sprintf('%6.3f + %6.3fi', real(val1), imag(val1));
-    %         str_val2 = sprintf('%6.3f + %6.3fi', real(val2), imag(val2));
+            % Format số phức để in ra màn hình
+            str_val1 = sprintf('%6.3f + %6.3fi', real(val1), imag(val1));
+            str_val2 = sprintf('%6.3f + %6.3fi', real(val2), imag(val2));
             
-    %         fprintf('%-6d | %-12d | %-8d | %-6d | %-20s | %-20s | %e\n', ...
-    %                 k, sub_c, sym_b, p, str_val1, str_val2, diff_val);
-    %     end
+            fprintf('%-6d | %-12d | %-8d | %-6d | %-20s | %-20s | %e\n', ...
+                    k, sub_c, sym_b, p, str_val1, str_val2, diff_val);
+        end
         
-    %     if total_errors > 15
-    %         fprintf('... (Còn %d vị trí lỗi khác không hiển thị)\n', total_errors - 15);
-    %     end
-    % end
-    % fprintf('\n======================================================\n');
+        if total_errors > 15
+            fprintf('... (Còn %d vị trí lỗi khác không hiển thị)\n', total_errors - 15);
+        end
+    end
+    fprintf('\n======================================================\n');
 end
