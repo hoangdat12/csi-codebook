@@ -58,7 +58,7 @@ for caseIdx = 1:length(ALL_Case)
     % -----------------------------------------------------------------
     % Generate Bits
     % -----------------------------------------------------------------
-    TBS = manualCalculateTBS(pdsch)
+    TBS = manualCalculateTBS(pdsch);
 
     inputBits = ones(TBS, 1);
 

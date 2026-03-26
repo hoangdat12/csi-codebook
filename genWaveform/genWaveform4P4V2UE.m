@@ -30,24 +30,6 @@ W2 = [
    0.0525 + 0.0216i   0.0068 + 0.0031i   0.0362 + 0.0050i  -0.0274 - 0.0224i
 ];
 
-P1        = W1 * pinv(W1);            % Projection matrix lên col-space W1
-W2_raw    = W2;                       % Giữ lại W2 gốc
-W2_ns     = (eye(size(P1)) - P1) * W2_raw;  % Chiếu xuống null-space W1
-
-W2 = W2_ns;
-
-ortho_check = W1' * W2;
-fprintf('=== Kiểm tra trực giao W1^H * W2 ===\n');
-disp(ortho_check);
-fprintf('Frobenius norm ||W1^H * W2||_F = %.6f\n\n', norm(ortho_check, 'fro'));
- 
-if norm(ortho_check, 'fro') < 0.01
-    fprintf('[OK] W1 và W2 trực giao → MU-MIMO không nhiễu inter-user\n\n');
-else
-    fprintf('[WARN] W1 và W2 KHÔNG hoàn toàn trực giao → Có inter-user interference\n');
-    fprintf('       Frobenius norm = %.4f (nên < 0.01)\n\n', norm(ortho_check, 'fro'));
-end
-
 % -----------------------------------------------------------------
 % Configuration Parameters
 % -----------------------------------------------------------------

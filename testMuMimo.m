@@ -79,7 +79,7 @@ function [BER1, BER2] = muMimo(...
     % UE2 Configuration
     % -----------------------------------------------------------------
     pdsch2 = pdsch; 
-    pdsch2.DMRS.DMRSPortSet = [4, 5, 6, 7]; 
+    pdsch2.DMRS.DMRSPortSet = [0, 1, 2, 3]; 
     pdsch2 = pdsch2.setMCS(MCS);
 
     [~, pdschInfo] = nrPDSCHIndices(carrier, pdsch2);
