@@ -74,6 +74,8 @@ for caseIdx = 1:length(ALL_Case)
         0.2296 - 0.0951i   0.2235 - 0.0743i   0.2924 + 0.0485i   0.2175 - 0.1932i
     ];
 
+    vsa_normalize_matrix(W);
+
     % =========================================================================
     % 1. MAPPING LÊN LAYER GRID & 2. PRECODING SANG PORT GRID
     % =========================================================================
@@ -141,3 +143,4 @@ for caseIdx = 1:length(ALL_Case)
     
     savevsarecordingmulti(ALL_Case(caseIdx).FILE_NAME, data_repeat, NFFT*scs, centerFreq, nchannel);
 end
+
