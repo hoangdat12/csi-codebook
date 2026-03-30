@@ -8,17 +8,17 @@ function W_mmse_transposed = getMMSEPrecoder(H_est, SNR_dB, ~)
     % Tính hệ số điều chuẩn alpha
     alpha = K / SNR_linear; 
     
-    % Tính toán ma trận nghịch đảo MMSE/RZF
+    % Tính toán ma trận nghịch đảo MMSE
     H_conj = H_est';
     term = (H_est * H_conj) + (alpha * eye(K));
     P = H_conj / term; 
     
-    % Chuẩn hóa công suất từng luồng (Equal Power Allocation)
-    for k = 1:K
-        norm_factor = norm(P(:, k));
-        P(:, k) = P(:, k) / norm_factor;
-    end
+    % -----------------------------------------------------------------
+    % [FIX LỖI IUI]: Dùng Frobenius Norm cho toàn bộ ma trận (Sum Power)
+    % Tuyệt đối không chuẩn hóa riêng lẻ từng cột để bảo toàn búp sóng null.
+    % -----------------------------------------------------------------
+    P_normalized = P * sqrt(K) / norm(P, 'fro');
     
     % Trả về ma trận chuyển vị
-    W_mmse_transposed = P.'; 
+    W_mmse_transposed = P_normalized.'; 
 end

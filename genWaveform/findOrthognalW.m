@@ -35,8 +35,6 @@ poolConfig.kmeansMaxIter  = 100;
 
 disp('--- Running K-Means to build Representative Pool ---');
 [W_pool, pool_indices, pool_pmi] = buildRepresentativePool(W_all, UE_Reported_Indices, poolConfig);
-%                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-%                                   Truyền thêm UE_Reported_Indices, nhận thêm pool_pmi
 
 % =========================================================================
 % 4. PHY Layer Configuration — 32T32R

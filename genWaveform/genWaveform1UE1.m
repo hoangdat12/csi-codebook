@@ -62,13 +62,19 @@ for caseIdx = 1:length(ALL_Case)
 
     inputBits = ones(TBS, 1);
 
+    fprintf('Số lượng Bits đầu vào (TBS): %d bits\n', TBS);
+
     % -----------------------------------------------------------------
     % PDSCH Modulation
     % -----------------------------------------------------------------
     [layerMappedSym, pdschInd] = myPDSCHEncode(pdsch, carrier, inputBits);
 
+    fprintf('Kích thước Symbols sau Layer Mapping [REs x Layers]: %d x %d\n', size(layerMappedSym, 1), size(layerMappedSym, 2));
+
     dmrsSym = genDMRS(carrier, pdsch);
     dmrsInd = DMRSIndices(pdsch, carrier);
+
+    fprintf('Kích thước DMRS Symbols [REs x Layers]: %d x %d\n', size(dmrsSym, 1), size(dmrsSym, 2));
 
     cfg = struct();
     cfg.CodebookConfig.N1 = N1;
@@ -85,8 +91,6 @@ for caseIdx = 1:length(ALL_Case)
         0.0000 - 0.0239i  -0.2222 - 0.0556i
     ];
 
-    vsa_normalize_matrix(W);
-
     % =========================================================================
     % 1. PRECODING TRỰC TIẾP TRÊN SYMBOL (Không dùng Grid 3 chiều)
     % =========================================================================
@@ -94,6 +98,9 @@ for caseIdx = 1:length(ALL_Case)
     % Phép nhân ma trận này sẽ trả ra kích thước [Số REs x nPorts]
     precodedPdschSym = layerMappedSym * (W.');
     precodedDmrsSym  = dmrsSym * (W.');
+
+    fprintf('Kích thước PDSCH sau Precoding [REs x Antenna Ports]: %d x %d\n', size(precodedPdschSym, 1), size(precodedPdschSym, 2));
+    fprintf('Kích thước DMRS sau Precoding [REs x Antenna Ports]: %d x %d\n', size(precodedDmrsSym, 1), size(precodedDmrsSym, 2));
 
     % Lấy index 2D (cột 1) để dùng chung cho mọi Antenna Ports. 
     % (Vị trí RE trên grid 2D là giống nhau đối với mọi port)
@@ -122,10 +129,12 @@ for caseIdx = 1:length(ALL_Case)
         % Mapping data và DMRS đã precoded lên grid 2D
         slotGrid2D(pdschInd_2D) = precodedPdschSym(:, p);
         slotGrid2D(dmrsInd_2D)  = precodedDmrsSym(:, p);
-        
+
         % Đưa slot grid 2D này vào đúng vị trí trên Frame tổng
         frameGrid(:, startSym:endSym, p) = slotGrid2D;
     end
+
+    fprintf('Kích thước Frame Grid tổng hợp [Subcarriers x Symbols x Ports]: %d x %d x %d\n', size(frameGrid, 1), size(frameGrid, 2), size(frameGrid, 3));
 
     NFFT = 4096; % Kích thước IFFT
     numRe = size(frameGrid, 1); 
@@ -155,6 +164,9 @@ for caseIdx = 1:length(ALL_Case)
     temp_txdata4 = ofdmModulation(txDataF_Port4, NFFT);
 
     txdata1 = [temp_txdata1, temp_txdata2, temp_txdata3, temp_txdata4];
+    
+    fprintf('Kích thước Matrix tín hiệu cuối cùng [Samples x Channels]: %d x %d\n', size(txdata1, 1), size(txdata1, 2));
+    fprintf('---------------------------------------------------\n');
 
     centerFreq = 0;
     nchannel = numTxPorts; 
@@ -162,4 +174,6 @@ for caseIdx = 1:length(ALL_Case)
     scs = 30000; % SCS 30kHz
     data_repeat = repmat(txdata1, nFrame, 1); 
     savevsarecordingmulti(ALL_Case(caseIdx).FILE_NAME, data_repeat, NFFT*scs, centerFreq, nchannel);
+
+    vsa_normalize_matrix(W);
 end

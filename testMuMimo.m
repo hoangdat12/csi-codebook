@@ -2,14 +2,14 @@ clear; clc; close all;
 
 setupPath();
 
-MCS = 12;
-nLayers = 4;
+MCS = 27;
+nLayers = 2;
 
 % W1 = [
 %     0.4000 - 0.1000i   0.6396 + 0.0000i;
 %   -0.4000 - 0.1000i   0.2132 + 0.0000i;
 %    0.0000 + 0.2828i   0.0000 + 0.1508i;
-%   -0.0000 - 0.2828i  -0.0000 - 0.1508i;
+%   -0.0000 - 0.2828i  -0.0000 - 0.1508i
 % ];
 
 
@@ -17,22 +17,23 @@ nLayers = 4;
 %     -0.1499 + 0.0530i  -0.2512 + 0.0000i;
 %    0.1499 + 0.0530i   0.1954 - 0.0000i;
 %    0.4240 + 0.2120i   0.3157 + 0.3157i;
-%    0.4240 - 0.2120i   0.3157 - 0.3157i;
+%    0.4240 - 0.2120i   0.3157 - 0.3157i
 % ];
 
 W1 = [
-    0.0202 + 0.0093i  -0.0009 - 0.0178i   0.0202 + 0.0248i   0.0090 - 0.0318i;
-   -0.0079 + 0.0053i  -0.0161 + 0.0100i   0.0170 - 0.0532i   0.0051 + 0.0202i;
-    0.4037 - 0.1570i   0.3281 - 0.2936i   0.3908 + 0.0731i   0.2605 - 0.3098i;
-    0.2296 - 0.0951i   0.2235 - 0.0743i   0.2924 + 0.0485i   0.2175 - 0.1932i
+    0.0139 + 0.1082i   0.4637 + 0.0480i;
+   0.1076 + 0.0290i   0.4065 - 0.3399i;
+   0.4763 - 0.3621i   0.0420 - 0.0068i;
+  -0.3066 + 0.1539i  -0.0066 + 0.0027i
 ];
 
 W2 = [
-   0.2321 - 0.3309i   0.3774 + 0.1391i   0.4134 - 0.0309i   0.1292 - 0.0777i;
-   0.0583 + 0.2800i   0.2942 + 0.0220i  -0.1680 + 0.2178i   0.0313 - 0.4716i;
-   0.0239 - 0.0324i   0.0125 - 0.0317i   0.0006 - 0.0337i   0.0464 - 0.0228i;
-   0.0525 + 0.0216i   0.0068 + 0.0031i   0.0362 + 0.0050i  -0.0274 - 0.0224i
+    -0.2233 - 0.1306i   0.0027 - 0.0195i;
+  -0.0478 - 0.3521i  -0.0042 - 0.0004i;
+  -0.0715 - 0.3288i  -0.3514 + 0.0723i;
+   0.4122 + 0.1540i   0.2217 + 0.5673i
 ];
+
 
 pdsch = customPDSCHConfig;
 pdsch.DMRS.DMRSConfigurationType = 1;
@@ -40,6 +41,7 @@ pdsch.DMRS.DMRSLength = 2; % <--- THÊM DÒNG NÀY (Double Symbol DMRS)
 pdsch.DMRS.DMRSAdditionalPosition = 1;
 pdsch.NumLayers = nLayers;
 pdsch.PRBSet = 0:272;
+pdsch.DMRS.NumCDMGroupsWithoutData = 2;
 
 carrier = nrCarrierConfig;
 carrier.SubcarrierSpacing = 30;
@@ -64,7 +66,7 @@ function [BER1, BER2] = muMimo(...
     % -----------------------------------------------------------------
     pdsch = basePDSCHConfig; 
 
-    pdsch.DMRS.DMRSPortSet = [0, 1, 2, 3]; 
+    pdsch.DMRS.DMRSPortSet = [0, 1]; 
     pdsch = pdsch.setMCS(MCS);
 
     [~, pdschInfo] = nrPDSCHIndices(carrier, pdsch);
@@ -79,7 +81,7 @@ function [BER1, BER2] = muMimo(...
     % UE2 Configuration
     % -----------------------------------------------------------------
     pdsch2 = pdsch; 
-    pdsch2.DMRS.DMRSPortSet = [0, 1, 2, 3]; 
+    pdsch2.DMRS.DMRSPortSet = [2, 3]; 
     pdsch2 = pdsch2.setMCS(MCS);
 
     [~, pdschInfo] = nrPDSCHIndices(carrier, pdsch2);
@@ -195,8 +197,8 @@ function rxBits = rxPDSCHDecode(carrier, pdsch, rxWaveform, txWaveform, TBS)
     rxGrid = rxGrid(1:carrier.NSizeGrid*12, 1:carrier.SymbolsPerSlot, :);
 
     [Hest, nVar] = nrChannelEstimate(carrier, rxGrid, dmrsInd, dmrsSym, ...
-        'CDMLengths', pdsch.DMRS.CDMLengths, ... 
-        'AveragingWindow', [1 1]);
+    'CDMLengths', pdsch.DMRS.CDMLengths, ...
+    'AveragingWindow', [11 1]);
 
     [pdschRx, pdschHest] = nrExtractResources(pdschInd, rxGrid, Hest);
     eqSymbols = nrEqualizeMMSE(pdschRx, pdschHest, nVar);

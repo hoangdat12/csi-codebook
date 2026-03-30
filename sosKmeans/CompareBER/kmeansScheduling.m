@@ -9,28 +9,28 @@ setupPath();
 % 1. Configuration for test — 32T32R
 % =========================================================================
 prepareDataConfig = struct();
-prepareDataConfig.Num_UEs           = 60000;
-prepareDataConfig.N1                = 8;   % 8x4 = 32 Tx ports
-prepareDataConfig.N2                = 4;
+prepareDataConfig.Num_UEs           = 10000;
+prepareDataConfig.N1                = 4;   % 8x4 = 32 Tx ports
+prepareDataConfig.N2                = 2;
 prepareDataConfig.O1                = 4;
 prepareDataConfig.O2                = 4;
 prepareDataConfig.L                 = 2;
-prepareDataConfig.NumLayers         = 1;
+prepareDataConfig.NumLayers         = 2;
 prepareDataConfig.subbandAmplitude  = true;
 prepareDataConfig.PhaseAlphabetSize = 8;
 
 % =========================================================================
 % 2. Prepare precoder matrix W for all UEs
 % =========================================================================
-disp('--- Generating data for 60,000 UEs (32T32R) ---');
+disp('--- Generating data for 10,000 UEs (32T32R) ---');
 [W_all, UE_Reported_Indices] = prepareData(prepareDataConfig);
 
 % =========================================================================
 % 3. Pre-Processing: Build representative UE pool via K-Means clustering
 % =========================================================================
 poolConfig = struct();
-poolConfig.numClusters    = 100;
-poolConfig.targetPoolSize = 500;
+poolConfig.numClusters    = 500;
+poolConfig.targetPoolSize = 2000;
 poolConfig.kmeansMaxIter  = 100;
 
 disp('--- Running K-Means to build Representative Pool ---');
@@ -40,7 +40,7 @@ disp('--- Running K-Means to build Representative Pool ---');
 % 4. PHY Layer Configuration — 32T32R
 % =========================================================================
 phyConfig = struct();
-phyConfig.MCS               = 4;
+phyConfig.MCS               = 27;
 phyConfig.SNR_dB            = 20;
 phyConfig.PRBSet            = 0:272;
 phyConfig.SubcarrierSpacing = 30;
@@ -49,7 +49,7 @@ phyConfig.NSizeGrid         = 273;
 % =========================================================================
 % 5. ĐÁNH GIÁ TỶ LỆ LỖI (BER) CHỈ DÙNG K-MEANS (Group Size: 2 -> 12)
 % =========================================================================
-groupSizes = 2:16;
+groupSizes = 2:8;
 numTestPoints = length(groupSizes);
 
 BER_KMeansOnly_Avg = zeros(1, numTestPoints);
@@ -95,85 +95,6 @@ xline(12, '--k', 'Giới hạn 12 DMRS Ports', 'LabelOrientation', 'horizontal',
 % =========================================================================
 % LOCAL FUNCTIONS 
 % =========================================================================
-
-function [W_all, UE_Reported_Indices] = prepareData(config)
-
-    % --- Read configuration fields (with default values) ---
-    Num_UEs           = getField(config, 'Num_UEs',           20000);
-    N1                = getField(config, 'N1',                4);
-    N2                = getField(config, 'N2',                1);
-    O1                = getField(config, 'O1',                4);
-    O2                = getField(config, 'O2',                1);
-    L                 = getField(config, 'L',                 2);
-    NumLayers         = getField(config, 'NumLayers',         1);
-    subbandAmplitude  = getField(config, 'subbandAmplitude',  true);
-    PhaseAlphabetSize = getField(config, 'PhaseAlphabetSize', 8);
-
-    % --- Generate random PMI indices for all UEs ---
-    fprintf('Generating PMI configuration for %d UEs...\n', Num_UEs);
-    UE_Reported_Indices = randomPMIConfig(Num_UEs, N1, N2, O1, O2, L, NumLayers, subbandAmplitude);
-
-    % --- Build cfg struct for generateTypeIIPrecoder ---
-    cfg = struct();
-    cfg.CodebookConfig.N1                = N1;
-    cfg.CodebookConfig.N2                = N2;
-    cfg.CodebookConfig.O1                = O1;
-    cfg.CodebookConfig.O2                = O2;
-    cfg.CodebookConfig.NumberOfBeams     = L;
-    cfg.CodebookConfig.PhaseAlphabetSize = PhaseAlphabetSize;
-    cfg.CodebookConfig.SubbandAmplitude  = subbandAmplitude;
-    cfg.CodebookConfig.numLayers         = NumLayers;
-
-    % --- Compute precoder matrix W_all for all UEs ---
-    Num_Antennas = 2 * N1 * N2;
-    W_all = zeros(Num_Antennas, NumLayers, Num_UEs);
-
-    fprintf('Computing precoder matrix W_all...\n');
-    for u = 1:Num_UEs
-        indices_ue = UE_Reported_Indices{u};
-        W_all(:, :, u) = generateTypeIIPrecoder(cfg, indices_ue.i1, indices_ue.i2);
-    end
-    fprintf('W_all completed: [%d x %d x %d]\n\n', size(W_all));
-
-end % end prepareData
-
-function [W_pool, pool_indices] = buildRepresentativePool(W_all, config)
-
-    % --- Read configuration fields ---
-    numClusters    = getField(config, 'numClusters',    50);
-    targetPoolSize = getField(config, 'targetPoolSize', 200);
-    kmeansMaxIter  = getField(config, 'kmeansMaxIter',  100);
-
-    [Num_Antennas, NumLayers, Num_UEs] = size(W_all);
-
-    % --- Extract features: flatten precoder matrices and split into Real/Imag parts ---
-    W_flat     = reshape(W_all, Num_Antennas * NumLayers, Num_UEs).';
-    W_features = [real(W_flat), imag(W_flat)];
-
-    % --- Run K-means with cosine distance to cluster UEs by beam direction similarity ---
-    fprintf('Running K-means (%d clusters) on %d UEs...\n', numClusters, Num_UEs);
-    [cluster_idx, ~] = kmeans(W_features, numClusters, ...
-                            'Distance', 'cosine',    ...
-                            'MaxIter',  kmeansMaxIter);
-
-    % --- Uniformly sample UEs from each cluster ---
-    ues_per_cluster = ceil(targetPoolSize / numClusters);
-
-    pool_indices = [];
-    for c = 1:numClusters
-        members     = find(cluster_idx == c);
-        members     = members(randperm(length(members)));       % Shuffle randomly
-        num_to_pick = min(ues_per_cluster, length(members));
-        pool_indices = [pool_indices; members(1:num_to_pick)]; 
-    end
-
-    W_pool = W_all(:, :, pool_indices);
-
-    fprintf('Representative pool: %d UEs from %d clusters (target: %d).\n\n', ...
-            length(pool_indices), numClusters, targetPoolSize);
-
-end
-
 function [bestGroups, bestScore] = runKMeansOnlyScheduling(W_matrix, groupSize, numClusters)
     % =========================================================================
     % RUNKMEANSONLYSCHEDULING: Lập lịch MU-MIMO chỉ sử dụng K-Means.
@@ -413,6 +334,84 @@ function BER_list = muMimo(carrier, basePDSCHConfig, UE_W_list, MCS, SNR_dB)
         rxBits      = rxPDSCHDecode(carrier, pdsch_list{u}, rxWaveform_noisy, txWaveform, TBS_list(u));
         BER_list(u) = biterr(double(inputBits_list{u}), double(rxBits)) / TBS_list(u);
     end
+end
+
+function [W_all, UE_Reported_Indices] = prepareData(config)
+
+    % --- Read configuration fields (with default values) ---
+    Num_UEs           = getField(config, 'Num_UEs',           20000);
+    N1                = getField(config, 'N1',                4);
+    N2                = getField(config, 'N2',                1);
+    O1                = getField(config, 'O1',                4);
+    O2                = getField(config, 'O2',                1);
+    L                 = getField(config, 'L',                 2);
+    NumLayers         = getField(config, 'NumLayers',         1);
+    subbandAmplitude  = getField(config, 'subbandAmplitude',  true);
+    PhaseAlphabetSize = getField(config, 'PhaseAlphabetSize', 8);
+
+    % --- Generate random PMI indices for all UEs ---
+    fprintf('Generating PMI configuration for %d UEs...\n', Num_UEs);
+    UE_Reported_Indices = randomPMIConfig(Num_UEs, N1, N2, O1, O2, L, NumLayers, subbandAmplitude);
+
+    % --- Build cfg struct for generateTypeIIPrecoder ---
+    cfg = struct();
+    cfg.CodebookConfig.N1                = N1;
+    cfg.CodebookConfig.N2                = N2;
+    cfg.CodebookConfig.O1                = O1;
+    cfg.CodebookConfig.O2                = O2;
+    cfg.CodebookConfig.NumberOfBeams     = L;
+    cfg.CodebookConfig.PhaseAlphabetSize = PhaseAlphabetSize;
+    cfg.CodebookConfig.SubbandAmplitude  = subbandAmplitude;
+    cfg.CodebookConfig.numLayers         = NumLayers;
+
+    % --- Compute precoder matrix W_all for all UEs ---
+    Num_Antennas = 2 * N1 * N2;
+    W_all = zeros(Num_Antennas, NumLayers, Num_UEs);
+
+    fprintf('Computing precoder matrix W_all...\n');
+    for u = 1:Num_UEs
+        indices_ue = UE_Reported_Indices{u};
+        W_all(:, :, u) = generateTypeIIPrecoder(cfg, indices_ue.i1, indices_ue.i2);
+    end
+    fprintf('W_all completed: [%d x %d x %d]\n\n', size(W_all));
+
+end % end prepareData
+
+function [W_pool, pool_indices] = buildRepresentativePool(W_all, config)
+
+    % --- Read configuration fields ---
+    numClusters    = getField(config, 'numClusters',    50);
+    targetPoolSize = getField(config, 'targetPoolSize', 200);
+    kmeansMaxIter  = getField(config, 'kmeansMaxIter',  100);
+
+    [Num_Antennas, NumLayers, Num_UEs] = size(W_all);
+
+    % --- Extract features: flatten precoder matrices and split into Real/Imag parts ---
+    W_flat     = reshape(W_all, Num_Antennas * NumLayers, Num_UEs).';
+    W_features = [real(W_flat), imag(W_flat)];
+
+    % --- Run K-means with cosine distance to cluster UEs by beam direction similarity ---
+    fprintf('Running K-means (%d clusters) on %d UEs...\n', numClusters, Num_UEs);
+    [cluster_idx, ~] = kmeans(W_features, numClusters, ...
+                            'Distance', 'cosine',    ...
+                            'MaxIter',  kmeansMaxIter);
+
+    % --- Uniformly sample UEs from each cluster ---
+    ues_per_cluster = ceil(targetPoolSize / numClusters);
+
+    pool_indices = [];
+    for c = 1:numClusters
+        members     = find(cluster_idx == c);
+        members     = members(randperm(length(members)));       % Shuffle randomly
+        num_to_pick = min(ues_per_cluster, length(members));
+        pool_indices = [pool_indices; members(1:num_to_pick)]; 
+    end
+
+    W_pool = W_all(:, :, pool_indices);
+
+    fprintf('Representative pool: %d UEs from %d clusters (target: %d).\n\n', ...
+            length(pool_indices), numClusters, targetPoolSize);
+
 end
 
 function val = getField(s, fname, default)

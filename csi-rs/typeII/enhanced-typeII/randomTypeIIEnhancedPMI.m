@@ -1,8 +1,8 @@
 function PMI = randomTypeIIEnhancedPMI(cfg, nLayers) 
     paramCombination = cfg.CodeBookConfig.ParamCombination;
     R = cfg.CodeBookConfig.NumberOfPMISubbandsPerCQISubband;
-    O1 = cfg.CodebookConfig.O1;
-    O2 = cfg.CodebookConfig.O2;
+    O1 = cfg.CodeBookConfig.O1;
+    O2 = cfg.CodeBookConfig.O2;
 
     bwpStart = cfg.CarrierConfig.NStartGrid;
     bwpSize = cfg.CarrierConfig.NSizeGrid;

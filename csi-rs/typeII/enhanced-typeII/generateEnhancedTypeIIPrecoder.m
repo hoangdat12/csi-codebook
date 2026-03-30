@@ -3,8 +3,8 @@ function W = generateEnhancedTypeIIPrecoder(cfg, nLayers, i1, i2)
     R = cfg.CodeBookConfig.NumberOfPMISubbandsPerCQISubband;
     N1 = cfg.CodeBookConfig.N1;
     N2 = cfg.CodeBookConfig.N2;
-    O1 = cfg.CodebookConfig.O1;
-    O2 = cfg.CodebookConfig.O2;
+    O1 = cfg.CodeBookConfig.O1;
+    O2 = cfg.CodeBookConfig.O2;
 
     bwpStart = cfg.CarrierConfig.NStartGrid;
     bwpSize = cfg.CarrierConfig.NSizeGrid;
