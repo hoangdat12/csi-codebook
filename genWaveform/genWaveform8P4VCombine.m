@@ -9,34 +9,37 @@ ALL_Case = [
            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
-           'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 1, ...
+           'DMRS_LENGTH', 2, 'DMRS_ADDITIONAL_POSITION', 1, ...
            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
            'FILE_NAME', '2UE_Combine_PDSCH_Waveform_4P4V');
 ];    
 
-N1 = 2; N2 = 1; O1 = 4; O2 = 1;
+N1 = 4; N2 = 1; O1 = 4; O2 = 1;
 
 W1 = [
-   0.2321 - 0.3309i   0.3774 + 0.1391i   0.4134 - 0.0309i   0.1292 - 0.0777i;
-   0.0583 + 0.2800i   0.2942 + 0.0220i  -0.1680 + 0.2178i   0.0313 - 0.4716i;
-   0.0239 - 0.0324i   0.0125 - 0.0317i   0.0006 - 0.0337i   0.0464 - 0.0228i;
-   0.0525 + 0.0216i   0.0068 + 0.0031i   0.0362 + 0.0050i  -0.0274 - 0.0224i
+   0.0058 - 0.0010i   0.0104 - 0.0129i   0.0037 + 0.0232i   0.0248 - 0.0026i;
+  -0.0027 + 0.0031i  -0.0184 - 0.0059i   0.0175 - 0.0337i  -0.0023 - 0.0075i;
+   0.0089 - 0.0029i   0.0005 + 0.0108i  -0.0345 + 0.0092i   0.0072 - 0.0123i;
+  -0.0083 - 0.0059i  -0.0034 + 0.0023i   0.0191 + 0.0039i  -0.0268 - 0.0064i;
+   0.1825 - 0.2778i   0.2527 - 0.1663i   0.2837 - 0.1104i   0.2049 - 0.2693i;
+  -0.1582 - 0.0877i  -0.2262 - 0.0013i  -0.2362 - 0.0681i  -0.2117 + 0.0056i;
+  -0.0964 - 0.0713i   0.1819 - 0.0000i   0.1614 + 0.0668i   0.0763 - 0.0618i;
+  -0.2149 + 0.2144i  -0.2593 - 0.0786i  -0.2152 - 0.1282i  -0.2678 + 0.0874i
 ];
 
 W2 = [
-    0.0202 + 0.0093i  -0.0009 - 0.0178i   0.0202 + 0.0248i   0.0090 - 0.0318i;
-   -0.0079 + 0.0053i  -0.0161 + 0.0100i   0.0170 - 0.0532i   0.0051 + 0.0202i;
-    0.4037 - 0.1570i   0.3281 - 0.2936i   0.3908 + 0.0731i   0.2605 - 0.3098i;
-    0.2296 - 0.0951i   0.2235 - 0.0743i   0.2924 + 0.0485i   0.2175 - 0.1932i
+   0.0850 + 0.2622i   0.1557 + 0.1206i   0.1346 + 0.2693i   0.1804 + 0.2972i;
+   0.0351 - 0.0444i  -0.1182 - 0.1444i   0.2057 + 0.0297i   0.1834 - 0.0936i;
+   0.0223 + 0.2126i  -0.0485 + 0.2878i   0.1766 - 0.0216i   0.0480 + 0.0379i;
+   0.3357 - 0.0759i   0.2888 - 0.0758i   0.1751 - 0.2200i   0.2370 - 0.1616i;
+   0.0077 - 0.0026i   0.0297 + 0.0106i   0.0378 + 0.0235i  -0.0068 + 0.0045i;
+  -0.0404 - 0.0180i   0.0075 - 0.0210i   0.0221 - 0.0454i  -0.0080 + 0.0014i;
+  -0.0178 + 0.0545i  -0.0000 + 0.0000i  -0.0264 - 0.0077i  -0.0048 + 0.0159i;
+   0.0367 + 0.0072i   0.0075 - 0.0210i   0.0111 - 0.0080i   0.0144 + 0.0082i
 ];
-
-
-W1 = vsa_normalize_matrix(W1)
-W2 = vsa_normalize_matrix(W2)
 
 score = PMIPair(W1, W2);
 disp(score);
-disp(abs(0.0483 - 0.0440i));
 
 % -----------------------------------------------------------------
 % Configuration Parameters
@@ -102,6 +105,9 @@ for caseIdx = 1:length(ALL_Case)
     % Phân bổ DMRS Port trực giao và Scrambling ID cho UE 2
     pdsch2.DMRS.DMRSPortSet = 0:3;
     pdsch2.DMRS.NSCID = 1;
+
+    % pdsch2.DMRS.DMRSPortSet = 4:7;
+    % pdsch2.DMRS.NSCID = 0;
 
     % =================================================================
     % TẠO BITS (GENERATE BITS)
@@ -194,28 +200,21 @@ for caseIdx = 1:length(ALL_Case)
     
     numTxPorts = nPorts; % Gán linh hoạt theo nPorts thay vì fix cứng bằng 4
 
-    txDataF_Port1 = [frameGrid(numRe/2+1:end, :, 1); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGrid(1:numRe/2, :, 1)];
+    txdata1 = []; 
 
-    txDataF_Port2 = [frameGrid(numRe/2+1:end, :, 2); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGrid(1:numRe/2, :, 2)];
-                    
-    txDataF_Port3 = [frameGrid(numRe/2+1:end, :, 3); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGrid(1:numRe/2, :, 3)];
-                    
-    txDataF_Port4 = [frameGrid(numRe/2+1:end, :, 4); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGrid(1:numRe/2, :, 4)];       
-
-    temp_txdata1 = ofdmModulation(txDataF_Port1, NFFT);
-    temp_txdata2 = ofdmModulation(txDataF_Port2, NFFT);
-    temp_txdata3 = ofdmModulation(txDataF_Port3, NFFT);
-    temp_txdata4 = ofdmModulation(txDataF_Port4, NFFT);
-
-    txdata1 = [temp_txdata1, temp_txdata2, temp_txdata3, temp_txdata4];
+    % Vòng lặp xử lý IFFT-shift và OFDM Modulation cho từng Port
+    for p = 1:numTxPorts
+        % 1. Dịch tần số (IFFT shift) và chèn Zero-padding cho Port p
+        txDataF_Port = [frameGrid(numRe/2+1:end, :, p); ...
+                        zeros(NFFT - numRe, numSymb); ...
+                        frameGrid(1:numRe/2, :, p)];
+        
+        % 2. Điều chế OFDM
+        temp_txdata = ofdmModulation(txDataF_Port, NFFT);
+        
+        % 3. Nối tiếp tín hiệu của Port p vào mảng tổng (ghép theo cột)
+        txdata1 = [txdata1, temp_txdata];
+    end
 
     % Mu-mimo
     centerFreq = 0;
@@ -225,29 +224,21 @@ for caseIdx = 1:length(ALL_Case)
     data_repeat = repmat(txdata1, nFrame, 1); 
     savevsarecordingmulti(ALL_Case(caseIdx).FILE_NAME, data_repeat, NFFT*scs, centerFreq, nchannel);
 
-    % UE1
-    txDataF_Port1 = [frameGridUE1(numRe/2+1:end, :, 1); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGridUE1(1:numRe/2, :, 1)];
+    txdata1 = []; 
 
-    txDataF_Port2 = [frameGridUE1(numRe/2+1:end, :, 2); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGridUE1(1:numRe/2, :, 2)];
-                    
-    txDataF_Port3 = [frameGridUE1(numRe/2+1:end, :, 3); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGridUE1(1:numRe/2, :, 3)];
-                    
-    txDataF_Port4 = [frameGridUE1(numRe/2+1:end, :, 4); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGridUE1(1:numRe/2, :, 4)];       
-
-    temp_txdata1 = ofdmModulation(txDataF_Port1, NFFT);
-    temp_txdata2 = ofdmModulation(txDataF_Port2, NFFT);
-    temp_txdata3 = ofdmModulation(txDataF_Port3, NFFT);
-    temp_txdata4 = ofdmModulation(txDataF_Port4, NFFT);
-
-    txdata1 = [temp_txdata1, temp_txdata2, temp_txdata3, temp_txdata4];
+    % Vòng lặp xử lý IFFT-shift và OFDM Modulation cho từng Port
+    for p = 1:numTxPorts
+        % 1. Dịch tần số (IFFT shift) và chèn Zero-padding cho Port p
+        txDataF_Port = [frameGridUE1(numRe/2+1:end, :, p); ...
+                        zeros(NFFT - numRe, numSymb); ...
+                        frameGridUE1(1:numRe/2, :, p)];
+        
+        % 2. Điều chế OFDM
+        temp_txdata = ofdmModulation(txDataF_Port, NFFT);
+        
+        % 3. Nối tiếp tín hiệu của Port p vào mảng tổng (ghép theo cột)
+        txdata1 = [txdata1, temp_txdata];
+    end
 
     centerFreq = 0;
     nchannel = numTxPorts; 
@@ -256,29 +247,21 @@ for caseIdx = 1:length(ALL_Case)
     data_repeat = repmat(txdata1, nFrame, 1); 
     savevsarecordingmulti("2UE_Combine_PDSCH_Waveform_4P4V_UE1", data_repeat, NFFT*scs, centerFreq, nchannel);
 
-    % UE1
-    txDataF_Port1 = [frameGridUE2(numRe/2+1:end, :, 1); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGridUE2(1:numRe/2, :, 1)];
+    txdata1 = []; 
 
-    txDataF_Port2 = [frameGridUE2(numRe/2+1:end, :, 2); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGridUE2(1:numRe/2, :, 2)];
-                    
-    txDataF_Port3 = [frameGridUE2(numRe/2+1:end, :, 3); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGridUE2(1:numRe/2, :, 3)];
-                    
-    txDataF_Port4 = [frameGridUE2(numRe/2+1:end, :, 4); ...
-                    zeros(NFFT - numRe, numSymb); ...
-                    frameGridUE2(1:numRe/2, :, 4)];       
-
-    temp_txdata1 = ofdmModulation(txDataF_Port1, NFFT);
-    temp_txdata2 = ofdmModulation(txDataF_Port2, NFFT);
-    temp_txdata3 = ofdmModulation(txDataF_Port3, NFFT);
-    temp_txdata4 = ofdmModulation(txDataF_Port4, NFFT);
-
-    txdata1 = [temp_txdata1, temp_txdata2, temp_txdata3, temp_txdata4];
+    % Vòng lặp xử lý IFFT-shift và OFDM Modulation cho từng Port
+    for p = 1:numTxPorts
+        % 1. Dịch tần số (IFFT shift) và chèn Zero-padding cho Port p
+        txDataF_Port = [frameGridUE2(numRe/2+1:end, :, p); ...
+                        zeros(NFFT - numRe, numSymb); ...
+                        frameGridUE2(1:numRe/2, :, p)];
+        
+        % 2. Điều chế OFDM
+        temp_txdata = ofdmModulation(txDataF_Port, NFFT);
+        
+        % 3. Nối tiếp tín hiệu của Port p vào mảng tổng (ghép theo cột)
+        txdata1 = [txdata1, temp_txdata];
+    end
 
     centerFreq = 0;
     nchannel = numTxPorts; 
