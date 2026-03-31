@@ -9,7 +9,7 @@ ALL_Case = [
            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
-           'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 1, ...
+           'DMRS_LENGTH', 2, 'DMRS_ADDITIONAL_POSITION', 1, ...
            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
            'FILE_NAME', '2UE_Combine_PDSCH_Waveform_4P4V');
 ];    
@@ -17,26 +17,20 @@ ALL_Case = [
 N1 = 2; N2 = 1; O1 = 4; O2 = 1;
 
 W1 = [
-   0.2321 - 0.3309i   0.3774 + 0.1391i   0.4134 - 0.0309i   0.1292 - 0.0777i;
-   0.0583 + 0.2800i   0.2942 + 0.0220i  -0.1680 + 0.2178i   0.0313 - 0.4716i;
-   0.0239 - 0.0324i   0.0125 - 0.0317i   0.0006 - 0.0337i   0.0464 - 0.0228i;
-   0.0525 + 0.0216i   0.0068 + 0.0031i   0.0362 + 0.0050i  -0.0274 - 0.0224i
+   0.3710 - 0.0340i   0.0450 + 0.0272i   0.0985 + 0.0230i   0.1655 + 0.0793i;
+  -0.1082 + 0.2126i   0.0129 + 0.0187i   0.0290 + 0.0075i  -0.3418 + 0.2284i;
+   0.0552 + 0.1186i   0.3005 + 0.2939i   0.2809 + 0.2203i  -0.1438 - 0.1576i;
+   0.1912 - 0.0241i   0.0280 - 0.2632i  -0.3320 - 0.0352i  -0.0310 - 0.0299i
 ];
 
 W2 = [
-    0.0202 + 0.0093i  -0.0009 - 0.0178i   0.0202 + 0.0248i   0.0090 - 0.0318i;
-   -0.0079 + 0.0053i  -0.0161 + 0.0100i   0.0170 - 0.0532i   0.0051 + 0.0202i;
-    0.4037 - 0.1570i   0.3281 - 0.2936i   0.3908 + 0.0731i   0.2605 - 0.3098i;
-    0.2296 - 0.0951i   0.2235 - 0.0743i   0.2924 + 0.0485i   0.2175 - 0.1932i
+    0.0793 + 0.0142i   0.4330 - 0.0183i  -0.2095 + 0.2583i   0.0121 + 0.0015i;
+   0.0213 - 0.0477i   0.1746 + 0.1746i  -0.3238 - 0.1793i  -0.0042 - 0.0017i;
+   0.3860 - 0.0244i   0.0310 - 0.0053i   0.0452 + 0.0072i   0.3734 - 0.1611i;
+  -0.2402 - 0.1830i   0.0129 + 0.0076i   0.0052 - 0.0166i  -0.2845 - 0.0589i
 ];
 
-
-W1 = vsa_normalize_matrix(W1)
-W2 = vsa_normalize_matrix(W2)
-
 score = PMIPair(W1, W2);
-disp(score);
-disp(abs(0.0483 - 0.0440i));
 
 % -----------------------------------------------------------------
 % Configuration Parameters
@@ -100,7 +94,7 @@ for caseIdx = 1:length(ALL_Case)
     pdsch2 = pdsch2.setMCS(ALL_Case(caseIdx).MCS);
 
     % Phân bổ DMRS Port trực giao và Scrambling ID cho UE 2
-    pdsch2.DMRS.DMRSPortSet = 0:3;
+    pdsch2.DMRS.DMRSPortSet = 4:7;
     pdsch2.DMRS.NSCID = 1;
 
     % =================================================================

@@ -11,7 +11,7 @@ NumUEs = 20000;
 
 % Cấu hình Codebook cho 4 Port (P_CSI-RS = 2 * N1 * N2 = 4)
 cfg.CodeBookConfig.CodebookType = 'typeII-r16';
-cfg.CodeBookConfig.N1 = 4;
+cfg.CodeBookConfig.N1 = 2;
 cfg.CodeBookConfig.N2 = 1; 
 
 % Bắt buộc paramCombination = 1 hoặc 2 khi cấu hình 4 Port
@@ -60,7 +60,7 @@ function [ue1_idx, ue2_idx, W1, W2, bestScore, pmi1, pmi2] = findBestOrthogonalP
 
     NUE = size(W_pool, 3);
 
-    bestScore = -inf;
+    bestScore = 1;
     ue1_idx   = -1;
     ue2_idx   = -1;
 
@@ -71,9 +71,10 @@ function [ue1_idx, ue2_idx, W1, W2, bestScore, pmi1, pmi2] = findBestOrthogonalP
             Wi = W_pool(:, :, i);
             Wj = W_pool(:, :, j);
 
-            score = chordalDistance(Wi, Wj);
+            results = PMIPair(Wi, Wj);
+            score = abs(results);
 
-            if score > bestScore
+            if score < bestScore
                 bestScore = score;
                 ue1_idx   = i;
                 ue2_idx   = j;
@@ -92,11 +93,8 @@ function [ue1_idx, ue2_idx, W1, W2, bestScore, pmi1, pmi2] = findBestOrthogonalP
     fprintf('\n========================================\n');
     fprintf('  Best orthogonal pair found:\n');
     fprintf('  UE %d  vs  UE %d\n', ue1_idx, ue2_idx);
-    fprintf('  Chordal Distance = %.6f\n', bestScore);
-    fprintf('  (1 = hoàn toàn trực giao, 0 = hoàn toàn tương quan)\n');
+    fprintf('  Score = %.6f\n', bestScore);
     fprintf('========================================\n');
-
-    fprintf('\nChordalDistance(W1, W2) = %.6f\n', chordalDistance(W1, W2));
 
     fprintf('W1 (UE %d):\n', ue1_idx); disp(W1);
     fprintf('W2 (UE %d):\n', ue2_idx); disp(W2);

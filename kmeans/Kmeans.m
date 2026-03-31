@@ -4,7 +4,7 @@ setupPath();
 % =========================================================
 % 1. CẤU HÌNH HỆ THỐNG (Khởi tạo biến config)
 % =========================================================
-config.Num_UEs = 10000;           % Tổng số người dùng (UEs) trong cell
+config.Num_UEs = 500;           % Tổng số người dùng (UEs) trong cell
 config.SubcarrierSpacing = 30; % 30 kHz (Ví dụ cho 5G NR)
 config.NSizeGrid = 273;        % Băng thông (số PRBs)
 config.SNR_dB = 20;            % Mức nhiễu mô phỏng
@@ -21,114 +21,174 @@ disp('--- Generating data for 10,000 UEs (32T32R) ---');
 % 3. Pre-Processing: Build representative UE pool via K-Means clustering
 % =========================================================================
 poolConfig = struct();
-poolConfig.numClusters    = 500;
-poolConfig.targetPoolSize = 2000;
+poolConfig.numClusters    = 50;
+poolConfig.targetPoolSize = 200;
 poolConfig.kmeansMaxIter  = 100;
 
 disp('--- Running K-Means to build Representative Pool ---');
 [W_pool, pool_indices] = buildRepresentativePool(W_all, poolConfig);
 
 % =========================================================================
-% 4. TÌM 2 UE TỪ POOL CÓ CHORDAL DISTANCE > 0.9 ĐỂ TRUYỀN THỬ
+% 4. TÌM 2 UE TỪ POOL CÓ ĐỘ TƯƠNG QUAN (PMIPAIR) < 0.1 ĐỂ TRUYỀN THỬ
 % =========================================================================
-targetThreshold = 0.9;
+targetThreshold = 0.1; % Tương quan càng nhỏ (< 0.1) càng trực giao tốt
 num_UEs_in_pool = size(W_pool, 3);
 foundPair = false;
 selected_idx = [0, 0];
 scoreTest = 0;
 
-fprintf('--- Đang tìm kiếm cặp UE có Chordal Distance > %.2f ---\n', targetThreshold);
+fprintf('--- Đang tìm kiếm cặp UE có tương quan PMIPair < %.2f ---\n', targetThreshold);
 
-% Duyệt qua các cặp trong Pool để tìm cặp thỏa mãn điều kiện
-for i = 1:(num_UEs_in_pool - 1)
-    W_i = W_pool(:, :, i);
-    for j = (i + 1):num_UEs_in_pool
-        W_j = W_pool(:, :, j);
+% % Duyệt qua các cặp trong Pool để tìm cặp thỏa mãn điều kiện
+% for i = 1:(num_UEs_in_pool - 1)
+%     W_i = W_pool(:, :, i);
+%     for j = (i + 1):num_UEs_in_pool
+%         W_j = W_pool(:, :, j);
         
-        % Gọi hàm chordalDistance anh em mình đã chuẩn hóa lúc trước
-        dist = chordalDistance(W_i, W_j);
+%         % Dùng PMIPair thay cho chordalDistance
+%         corr_complex = PMIPair(W_i, W_j);
+%         corr_mag = abs(corr_complex); % Lấy độ lớn của số phức
         
-        if dist > targetThreshold
-            selected_idx = [i, j];
-            scoreTest = dist;
-            foundPair = true;
-            break; % Tìm thấy là thoát vòng lặp j luôn cho nhẹ máy
-        end
-    end
-    if foundPair
-        break; % Thoát vòng lặp i
-    end
-end
+%         if corr_mag < targetThreshold
+%             selected_idx = [i, j];
+%             scoreTest = corr_mag;
+%             foundPair = true;
+%             break; % Tìm thấy là thoát vòng lặp j luôn cho nhẹ máy
+%         end
+%     end
+%     if foundPair
+%         break; % Thoát vòng lặp i
+%     end
+% end
 
-if foundPair
-    % Lấy ngược lại ID gốc trong 10.000 UEs ban đầu
-    test_UE_IDs = pool_indices(selected_idx);
+% if foundPair
+%     % Lấy ngược lại ID gốc trong 10.000 UEs ban đầu
+%     test_UE_IDs = pool_indices(selected_idx);
     
-    fprintf('=> ĐÃ TÌM THẤY!\n');
-    fprintf('UE 1 (ID gốc: %d)\n', test_UE_IDs(1));
-    fprintf('UE 2 (ID gốc: %d)\n', test_UE_IDs(2));
-    fprintf('Chordal Distance của cặp này: %.4f\n\n', scoreTest);
+%     fprintf('=> ĐÃ TÌM THẤY!\n');
+%     fprintf('UE 1 (ID gốc: %d)\n', test_UE_IDs(1));
+%     fprintf('UE 2 (ID gốc: %d)\n', test_UE_IDs(2));
+%     fprintf('Độ tương quan (PMIPair) của cặp này: %.4f (Càng nhỏ càng tốt)\n\n', scoreTest);
 
-    % Lấy ma trận Precoder W của 2 UE này để truyền
-    W1 = W_pool(:, :, selected_idx(1));
-    W2 = W_pool(:, :, selected_idx(2));
+%     % Lấy ma trận Precoder W của 2 UE này để truyền
+%     W1 = W_pool(:, :, selected_idx(1));
+%     W2 = W_pool(:, :, selected_idx(2));
 
-    pdsch = customPDSCHConfig;
-    pdsch.DMRS.DMRSConfigurationType = 1;
-    pdsch.DMRS.DMRSLength = 2; % <--- THÊM DÒNG NÀY (Double Symbol DMRS)
-    pdsch.DMRS.DMRSAdditionalPosition = 1;
-    pdsch.NumLayers = 2;
-    pdsch.PRBSet = 0:272;
-    pdsch.DMRS.NumCDMGroupsWithoutData = 2;
+%     pdsch = customPDSCHConfig;
+%     pdsch.DMRS.DMRSConfigurationType = 1;
+%     pdsch.DMRS.DMRSLength = 2; % <--- THÊM DÒNG NÀY (Double Symbol DMRS)
+%     pdsch.DMRS.DMRSAdditionalPosition = 1;
+%     pdsch.NumLayers = 2;
+%     pdsch.PRBSet = 0:272;
+%     pdsch.DMRS.NumCDMGroupsWithoutData = 2;
 
-    carrier = nrCarrierConfig;
-    carrier.SubcarrierSpacing = 30;
-    % With 273 RB, we need scs 30 
-    carrier.NSizeGrid = 273;
+%     carrier = nrCarrierConfig;
+%     carrier.SubcarrierSpacing = 30;
+%     % With 273 RB, we need scs 30 
+%     carrier.NSizeGrid = 273;
 
     
-    disp('Đã nạp xong cấu hình Carrier và PDSCH. Sẵn sàng chạy mô phỏng!');
+%     disp('Đã nạp xong cấu hình Carrier và PDSCH. Sẵn sàng chạy mô phỏng!');
 
-    [BER1, BER2] = muMimo(...
-        carrier, pdsch, ...
-        W1, W2, 27, 30 ...
-    );
+%     [BER1, BER2] = muMimo(...
+%         carrier, pdsch, ...
+%         W1, W2, 27, 30 ...
+%     );
 
-    disp("Selected W");
+%     disp("Selected W (Dựa trên PMIPair):");
 
-    disp(BER1);
-    disp(BER2);
+%     disp(BER1);
+%     disp(BER2);
 
-    num_UEs_in_pool = size(W_pool, 3);
+%     num_UEs_in_pool = size(W_pool, 3);
 
-    % Lấy 2 chỉ số ngẫu nhiên không trùng nhau
-    selected_idx = randperm(num_UEs_in_pool, 2);
+%     % Lấy 2 chỉ số ngẫu nhiên không trùng nhau
+%     selected_idx = randperm(num_UEs_in_pool, 2);
 
-    W_i = W_pool(:, :, selected_idx(1));
-    W_j = W_pool(:, :, selected_idx(2));
+%     W_i = W_pool(:, :, selected_idx(1));
+%     W_j = W_pool(:, :, selected_idx(2));
 
-    dist = chordalDistance(W_i, W_j);
-    disp(dist);
+%     % Tính độ tương quan ngẫu nhiên
+%     corr_rand_mag = abs(PMIPair(W_i, W_j));
+%     disp('Độ tương quan (PMIPair) của cặp Random:');
+%     disp(corr_rand_mag);
 
-    [BER1, BER2] = muMimo(...
-        carrier, pdsch, ...
-        W_i, W_j, 27, 30 ...
-    );
+%     [BER1, BER2] = muMimo(...
+%         carrier, pdsch, ...
+%         W_i, W_j, 27, 30 ...
+%     );
 
-    disp(W_j);
-    disp(W_i);
+%     disp("Random W:");
 
-    disp("Random W");
+%     disp(BER1);
+%     disp(BER2);
+% else
+%     % Nếu Pool không có cặp nào < 0.1
+%     fprintf('=> CẢNH BÁO: Không tìm thấy cặp UE nào đạt ngưỡng tương quan < %.2f!\n', targetThreshold);
+%     fprintf('Bro có thể thử tăng targetThreshold lên 0.15 hoặc 0.2 nhé.\n');
+% end
 
-    disp(BER1);
-    disp(BER2);
+% =========================================================================
+% 5. SO SÁNH: TRUNG BÌNH CÁC CẶP NGẪU NHIÊN vs TẤT CẢ CÁC CẶP TỪ SOS
+% =========================================================================
+disp('--- SO SÁNH ĐIỂM SỐ TRUNG BÌNH: RANDOM vs SOS (DÙNG PMIPAIR) ---');
 
+num_total_UEs = size(W_all, 3); 
+threshold_SOS = 0.1;
+
+% Gọi hàm SOS (Hứng đủ 3 biến đầu ra)
+[bestGroups, suMimoUEs, bestScore] = sosMUMIMOScheduling(W_all, 2, 100, threshold_SOS);
+num_pairs = length(bestGroups);
+
+fprintf('=> Thuật toán SOS chốt được %d cặp đạt chuẩn (Tương quan <= %.2f)\n\n', num_pairs, threshold_SOS);
+
+if num_pairs == 0
+    disp('=> KHÔNG CÓ CẶP NÀO TỪ SOS ĐẠT YÊU CẦU! Bro hãy thử tăng threshold lên 0.15 hoặc 0.2 nhé.');
 else
-    % Nếu Pool không có cặp nào > 0.9 (hiếm khi xảy ra với 2000 UEs)
-    fprintf('=> CẢNH BÁO: Không tìm thấy cặp UE nào đạt ngưỡng > %.2f!\n', targetThreshold);
-    fprintf('Bro có thể thử giảm targetThreshold xuống 0.8 hoặc 0.85 nhé.\n');
-end
+    % ---------------------------------------------------------
+    % 5.1 Tính điểm trung bình của TẤT CẢ các cặp từ SOS
+    % ---------------------------------------------------------
+    total_corr_sos = 0;
+    for g = 1:num_pairs
+        pair = bestGroups{g}; 
+        W_sos_1 = W_all(:, :, pair(1));
+        W_sos_2 = W_all(:, :, pair(2));
+        
+        total_corr_sos = total_corr_sos + abs(PMIPair(W_sos_1, W_sos_2));
+    end
+    avg_corr_sos = total_corr_sos / num_pairs;
+    fprintf('=> [SOS] Độ tương quan TRUNG BÌNH của %d cặp này: %.4f\n', num_pairs, avg_corr_sos);
 
+    % ---------------------------------------------------------
+    % 5.2 Tạo NGẪU NHIÊN cùng số lượng cặp và tính trung bình
+    % ---------------------------------------------------------
+    % Bốc ngẫu nhiên (num_pairs * 2) UEs từ tổng số UEs để tạo thành num_pairs cặp
+    % Dùng randperm để đảm bảo các UE ngẫu nhiên này KHÔNG bị trùng lặp (giống hệt cơ chế xếp lịch)
+    random_UEs = randperm(num_total_UEs, num_pairs * 2);
+    
+    total_corr_rand = 0;
+    for g = 1:num_pairs
+        % Lấy từng 2 UE đứng cạnh nhau trong mảng random để ghép cặp
+        u1 = random_UEs(2*g - 1);
+        u2 = random_UEs(2*g);
+        
+        W_rand_1 = W_all(:, :, u1);
+        W_rand_2 = W_all(:, :, u2);
+        
+        total_corr_rand = total_corr_rand + abs(PMIPair(W_rand_1, W_rand_2));
+    end
+    avg_corr_rand = total_corr_rand / num_pairs;
+    fprintf('=> [RANDOM] Độ tương quan TRUNG BÌNH của %d cặp ngẫu nhiên: %.4f\n\n', num_pairs, avg_corr_rand);
+    
+    % ---------------------------------------------------------
+    % 5.3 Kết luận chênh lệch
+    % ---------------------------------------------------------
+    fprintf('=> NHẬN XÉT: Thuật toán SOS giảm được %.2f%% mức độ nhiễu so với Random!\n', ...
+            (avg_corr_rand - avg_corr_sos) / avg_corr_rand * 100);
+end
+% -------------------------------------------------------------------
+% Local function
+% -------------------------------------------------------------------
 function [BER1, BER2] = muMimo(...
     carrier, basePDSCHConfig, ...
     UE1_W, UE2_W, MCS, SNR_dB ...
@@ -327,8 +387,6 @@ function [out, hasError] = PDSCHDecode(pdsch, carrier, eqSymbols, TBS, nVar)
     [out, hasError] = nrCRCDecode(rxPart, '24A');
 end
 
-
-
 function [W_all, UE_Reported_Indices] = prepareData(config)
     % 1. Lấy số lượng UEs từ config (Sửa lỗi chưa khai báo biến)
     Num_UEs = config.Num_UEs; 
@@ -392,7 +450,7 @@ function [W_pool, pool_indices] = buildRepresentativePool(W_all, config)
     kmeansMaxIter  = getField(config, 'kmeansMaxIter',  100);
     minPerCluster  = getField(config, 'minPerCluster',  1);
 
-    [Num_Antennas, NumLayers, Num_UEs] = size(W_all);
+    [Num_Antennas, ~, Num_UEs] = size(W_all);
 
     % Guard: Không thể có nhiều cụm hơn số UE
     numClusters = min(numClusters, Num_UEs);
