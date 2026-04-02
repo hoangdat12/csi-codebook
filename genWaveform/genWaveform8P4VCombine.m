@@ -14,8 +14,9 @@ ALL_Case = [
            'FILE_NAME', '2UE_Combine_PDSCH_Waveform_8P4V');
 ];    
 
-N1 = 4; N2 = 1; O1 = 4; O2 = 1;
-
+% -----------------------------------------------------------------
+% Ma trận Trực giao được chọn ra từ hàm (findOrthognalWTypeIIEnhanced)
+% -----------------------------------------------------------------
 W1 = [
    0.0081 + 0.0134i  -0.0228 + 0.0187i  -0.0283 + 0.0292i   0.3313 + 0.0434i;
    0.0102 - 0.0089i  -0.1025 + 0.2243i   0.0302 - 0.0076i  -0.0580 - 0.2032i;
@@ -28,7 +29,7 @@ W1 = [
 ];
 
 W2 = [
-    0.0161 + 0.0011i   0.0080 + 0.0026i   0.2460 + 0.0777i  -0.0036 - 0.0824i;
+   0.0161 + 0.0011i   0.0080 + 0.0026i   0.2460 + 0.0777i  -0.0036 - 0.0824i;
   -0.0060 - 0.0084i  -0.0028 - 0.0027i  -0.1851 - 0.2016i   0.0237 + 0.0155i;
    0.0043 + 0.0018i   0.0054 + 0.0012i   0.0657 + 0.2319i  -0.0533 - 0.0951i;
   -0.0102 - 0.0084i  -0.0052 - 0.0077i  -0.0060 - 0.2230i  -0.0676 + 0.1153i;
@@ -38,184 +39,18 @@ W2 = [
   -0.2023 - 0.2405i  -0.1515 + 0.1912i  -0.0120 - 0.0043i  -0.0961 - 0.2111i
 ];
 
+vsa_normalize_matrix(W1, W2);
+
+% -----------------------------------------------------------------
+% Tính lại điểm trực giao của 2 Ma trận dựa vào thuật toán
+% -----------------------------------------------------------------
 score = PMIPair(W1, W2);
-disp(score);
-disp(abs(score));
+fprintf(' * Giá trị phức (Complex)::: %8.4f %+.4fi\n', real(score), imag(score));
+fprintf(' * Biên độ tuyệt đối (Abs)::: %8.4f\n\n', abs(score));
 
-% -----------------------------------------------------------------
-% Configuration Parameters
-% -----------------------------------------------------------------
+outWaveforms = cell(length(ALL_Case), 1);
+
 for caseIdx = 1:length(ALL_Case)
-    % -----------------------------------------------------------------
-    % Carrier Configuration
-    % -----------------------------------------------------------------
-    carrier = nrCarrierConfig;
-    
-    % Lấy dữ liệu từ struct hiện tại bằng ALL_Case(caseIdx).
-    carrier.SubcarrierSpacing = ALL_Case(caseIdx).SUBCARRIER_SPACING;  
-    carrier.NSizeGrid         = ALL_Case(caseIdx).NSIZE_GRID;
-    carrier.CyclicPrefix      = ALL_Case(caseIdx).CYCLIC_PREFIX;
-    carrier.NSlot             = ALL_Case(caseIdx).NSLOT;
-    carrier.NFrame            = ALL_Case(caseIdx).NFRAME;
-    carrier.NCellID           = ALL_Case(caseIdx).NCELL_ID;
-
-    % -----------------------------------------------------------------
-    % PDSCH Configuration
-    % -----------------------------------------------------------------
-    % =================================================================
-    % KHỞI TẠO PDSCH CHO UE 1
-    % =================================================================
-    pdsch1 = customPDSCHConfig(); 
-
-    pdsch1.DMRS.DMRSConfigurationType   = ALL_Case(caseIdx).DMRS_CONFIGURATION_TYPE; 
-    pdsch1.DMRS.DMRSTypeAPosition       = ALL_Case(caseIdx).DMRS_TYPEA_POSITION; 
-    pdsch1.DMRS.NumCDMGroupsWithoutData = ALL_Case(caseIdx).DMRS_NUMCDMGROUP_WITHOUT_DATA;
-    pdsch1.DMRS.DMRSLength              = ALL_Case(caseIdx).DMRS_LENGTH;
-    pdsch1.DMRS.DMRSAdditionalPosition  = ALL_Case(caseIdx).DMRS_ADDITIONAL_POSITION;
-
-    pdsch1.NumLayers   = ALL_Case(caseIdx).NLAYERS;
-    pdsch1.MappingType = ALL_Case(caseIdx).PDSCH_MAPPING_TYPE;
-    pdsch1.RNTI        = ALL_Case(caseIdx).PDSCH_RNTI;
-    pdsch1.PRBSet      = ALL_Case(caseIdx).PDSCH_PRBSET;
-    pdsch1.SymbolAllocation = [ALL_Case(caseIdx).PDSCH_START_SYMBOL, 14 - ALL_Case(caseIdx).PDSCH_START_SYMBOL];
-    pdsch1 = pdsch1.setMCS(ALL_Case(caseIdx).MCS);
-
-    % Phân bổ DMRS Port và Scrambling ID cho UE 1
-    pdsch1.DMRS.DMRSPortSet = 0:3;
-    pdsch1.DMRS.NSCID = 0;
-
-    % =================================================================
-    % KHỞI TẠO PDSCH CHO UE 2
-    % =================================================================
-    pdsch2 = customPDSCHConfig(); 
-
-    pdsch2.DMRS.DMRSConfigurationType   = ALL_Case(caseIdx).DMRS_CONFIGURATION_TYPE; 
-    pdsch2.DMRS.DMRSTypeAPosition       = ALL_Case(caseIdx).DMRS_TYPEA_POSITION; 
-    pdsch2.DMRS.NumCDMGroupsWithoutData = ALL_Case(caseIdx).DMRS_NUMCDMGROUP_WITHOUT_DATA;
-    pdsch2.DMRS.DMRSLength              = ALL_Case(caseIdx).DMRS_LENGTH;
-    pdsch2.DMRS.DMRSAdditionalPosition  = ALL_Case(caseIdx).DMRS_ADDITIONAL_POSITION;
-
-    pdsch2.NumLayers   = ALL_Case(caseIdx).NLAYERS;
-    pdsch2.MappingType = ALL_Case(caseIdx).PDSCH_MAPPING_TYPE;
-    pdsch2.RNTI        = ALL_Case(caseIdx).PDSCH_RNTI + 1; 
-    pdsch2.PRBSet      = ALL_Case(caseIdx).PDSCH_PRBSET;
-    pdsch2.SymbolAllocation = [ALL_Case(caseIdx).PDSCH_START_SYMBOL, 14 - ALL_Case(caseIdx).PDSCH_START_SYMBOL];
-    pdsch2 = pdsch2.setMCS(ALL_Case(caseIdx).MCS);
-
-    pdsch2.DMRS.DMRSPortSet = 4:7;
-    pdsch2.DMRS.NSCID = 0;
-
-    % =================================================================
-    % TẠO BITS (GENERATE BITS)
-    % =================================================================
-    TBS1 = manualCalculateTBS(pdsch1);
-    TBS2 = manualCalculateTBS(pdsch2);
-
-    inputBits1 = ones(TBS1, 1);
-    inputBits2 = zeros(TBS2, 1);
-
-    % =================================================================
-    % ĐIỀU CHẾ PDSCH VÀ DMRS (MODULATION)
-    % =================================================================
-    [layerMappedSym1, pdschInd1] = myPDSCHEncode(pdsch1, carrier, inputBits1);
-    [layerMappedSym2, pdschInd2] = myPDSCHEncode(pdsch2, carrier, inputBits2);
-
-    dmrsSym1 = genDMRS(carrier, pdsch1);
-    dmrsInd1 = DMRSIndices(pdsch1, carrier);
-
-    dmrsSym2 = genDMRS(carrier, pdsch2);
-    dmrsInd2 = DMRSIndices(pdsch2, carrier);
-
-    % =========================================================================
-    % 1. MAPPING LÊN LAYER GRID CHO TỪNG UE (Giữ nguyên cấu trúc CDM Groups)
-    % =========================================================================
-    nPorts = size(W1, 1); 
-    nLayers1 = pdsch1.NumLayers;
-    nLayers2 = pdsch2.NumLayers;
-    K = carrier.NSizeGrid * 12;
-    symbolsPerSlot = carrier.SymbolsPerSlot;
-    currentSlotIdx = carrier.NSlot; 
-
-    % Khởi tạo Layer Grid 3D trống cho Slot hiện tại
-    layerGrid_UE1 = zeros(K, symbolsPerSlot, nLayers1);
-    layerGrid_UE2 = zeros(K, symbolsPerSlot, nLayers2);
-
-    % Map PDSCH và DMRS cho UE 1 (Lặp qua từng layer để không đè REs)
-    for layer = 1:nLayers1
-        layerGrid_UE1(pdschInd1(:, layer)) = layerMappedSym1(:, layer);
-        layerGrid_UE1(dmrsInd1(:, layer))  = dmrsSym1(:, layer);
-    end
-
-    % Map PDSCH và DMRS cho UE 2
-    for layer = 1:nLayers2
-        layerGrid_UE2(pdschInd2(:, layer)) = layerMappedSym2(:, layer);
-        layerGrid_UE2(dmrsInd2(:, layer))  = dmrsSym2(:, layer);
-    end
-
-    % =========================================================================
-    % 2. PRECODING TỪ LAYER GRID SANG PORT GRID
-    % =========================================================================
-    % Chuyển Layer Grid thành mảng 2D [(K*14) x nLayers] để nhân Precoding matrix
-    layerGrid_flat_UE1 = reshape(layerGrid_UE1, K * symbolsPerSlot, nLayers1);
-    layerGrid_flat_UE2 = reshape(layerGrid_UE2, K * symbolsPerSlot, nLayers2);
-
-    % Thực hiện Precoding: Port_Data = Layer_Data * W' 
-    % Output size: [(K*14) x nPorts]
-    portGrid_flat_UE1 = layerGrid_flat_UE1 * (W1.'); 
-    portGrid_flat_UE2 = layerGrid_flat_UE2 * (W2.'); 
-
-    % Chuyển về lại kích thước Grid 3 chiều [K x 14 x nPorts]
-    portGrid_UE1 = reshape(portGrid_flat_UE1, K, symbolsPerSlot, nPorts);
-    portGrid_UE2 = reshape(portGrid_flat_UE2, K, symbolsPerSlot, nPorts);
-
-    % Cộng dồn tín hiệu MU-MIMO (Superposition)
-    portGrid_Combined = portGrid_UE1 + portGrid_UE2;
-
-    % =========================================================================
-    % 3. ĐƯA VÀO FRAME GRID TỔNG
-    % =========================================================================
-    % Khởi tạo Frame Grid 3 chiều (Tần số x Thời gian x Antennas)
-    frameGrid    = zeros(K, 280, nPorts); 
-    frameGridUE1 = zeros(K, 280, nPorts); 
-    frameGridUE2 = zeros(K, 280, nPorts); 
-
-    startSym = currentSlotIdx * symbolsPerSlot + 1;
-    endSym   = (currentSlotIdx + 1) * symbolsPerSlot;
-
-    % Nhét Slot Port Grid tương ứng vào Frame tổng (Không cần vòng lặp for từng Port nữa)
-    frameGrid(:, startSym:endSym, :)    = portGrid_Combined;
-    frameGridUE1(:, startSym:endSym, :) = portGrid_UE1;
-    frameGridUE2(:, startSym:endSym, :) = portGrid_UE2;
-
-    % =========================================================================
-    % 4. THÔNG SỐ OFDM
-    % =========================================================================
-    NFFT = 4096; % Kích thước IFFT
-    numRe = size(frameGrid, 1); % Tổng số subcarriers mang dữ liệu
-    numSymb = size(frameGrid, 2); % Tổng số symbol trong frameGrid
-    
-    numTxPorts = nPorts; % Gán linh hoạt theo nPorts thay vì fix cứng bằng 4
-
-    txdata1 = []; 
-
-    % Vòng lặp xử lý IFFT-shift và OFDM Modulation cho từng Port
-    for p = 1:numTxPorts
-        % 1. Dịch tần số (IFFT shift) và chèn Zero-padding cho Port p
-        txDataF_Port = [frameGrid(numRe/2+1:end, :, p); ...
-                        zeros(NFFT - numRe, numSymb); ...
-                        frameGrid(1:numRe/2, :, p)];
-        
-        % 2. Điều chế OFDM
-        temp_txdata = ofdmModulation(txDataF_Port, NFFT);
-        
-        % 3. Nối tiếp tín hiệu của Port p vào mảng tổng (ghép theo cột)
-        txdata1 = [txdata1, temp_txdata];
-    end
-
-    centerFreq = 0;
-    nchannel = numTxPorts; 
-    nFrame = 5; 
-    scs = 30000; % SCS 30kHz
-    data_repeat = repmat(txdata1, nFrame, 1); 
-    savevsarecordingmulti(ALL_Case(caseIdx).FILE_NAME, data_repeat, NFFT*scs, centerFreq, nchannel);
+    baseConfig = ALL_Case(caseIdx);
+    outWaveforms{caseIdx} = genWaveformMumimo2UESameLayer(baseConfig, W1, W2);
 end

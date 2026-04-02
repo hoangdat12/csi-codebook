@@ -5,29 +5,30 @@ setupPath();
 ALL_Case = [
     % Case 1: Default
     struct('desc', 'Case 1: Default', ...
-           'NLAYERS', 4, 'MCS', 27, ...
+           'NLAYERS', 2, 'MCS', 27, ...
            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
-           'DMRS_LENGTH', 2, 'DMRS_ADDITIONAL_POSITION', 1, ...
+           'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 1, ...
            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
-           'FILE_NAME', '2UE_Combine_PDSCH_Waveform_4P4V');
-];    
+           'FILE_NAME', '2UE_Combine_PDSCH_Waveform_4P2V');
+];
 
-N1 = 2; N2 = 1; O1 = 4; O2 = 1;
-
+% -----------------------------------------------------------------
+% Ma trận Trực giao được chọn ra từ hàm (findOrthognalW)
+% -----------------------------------------------------------------
 W1 = [
-   0.3710 - 0.0340i   0.0450 + 0.0272i   0.0985 + 0.0230i   0.1655 + 0.0793i;
-  -0.1082 + 0.2126i   0.0129 + 0.0187i   0.0290 + 0.0075i  -0.3418 + 0.2284i;
-   0.0552 + 0.1186i   0.3005 + 0.2939i   0.2809 + 0.2203i  -0.1438 - 0.1576i;
-   0.1912 - 0.0241i   0.0280 - 0.2632i  -0.3320 - 0.0352i  -0.0310 - 0.0299i
+    0.4619 - 0.1633i   0.4444 + 0.0000i;
+   -0.4619 - 0.1633i  -0.4444 + 0.0000i;
+   -0.0000 - 0.1394i   0.2222 - 0.0556i;
+    0.0000 - 0.0239i  -0.2222 - 0.0556i
 ];
 
 W2 = [
-    0.0793 + 0.0142i   0.4330 - 0.0183i  -0.2095 + 0.2583i   0.0121 + 0.0015i;
-   0.0213 - 0.0477i   0.1746 + 0.1746i  -0.3238 - 0.1793i  -0.0042 - 0.0017i;
-   0.3860 - 0.0244i   0.0310 - 0.0053i   0.0452 + 0.0072i   0.3734 - 0.1611i;
-  -0.2402 - 0.1830i   0.0129 + 0.0076i   0.0052 - 0.0166i  -0.2845 - 0.0589i
+    0.2132 - 0.1066i  -0.0845 - 0.0845i;
+    0.2132 + 0.1066i  -0.0845 + 0.0845i;
+    0.4264 + 0.1066i   0.4781 + 0.0845i;
+    0.4264 - 0.1066i   0.4781 - 0.0845i
 ];
 
 vsa_normalize_matrix(W1, W2);
