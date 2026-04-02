@@ -15,7 +15,7 @@ prepareDataConfig.N2                = 1;
 prepareDataConfig.O1                = 4;
 prepareDataConfig.O2                = 4;
 prepareDataConfig.L                 = 2;
-prepareDataConfig.NumLayers         = 2;
+prepareDataConfig.NumLayers         = 1;
 prepareDataConfig.subbandAmplitude  = true;
 prepareDataConfig.PhaseAlphabetSize = 4;
 
@@ -51,8 +51,6 @@ phyConfig.NSizeGrid         = 273;
 % =========================================================================
 fprintf('\n[Pre-search] Finding most orthogonal UE pair in pool...\n');
 [ue1, ue2, W1, W2, pairDist, pmi1, pmi2] = findBestOrthogonalPair(W_pool, pool_pmi);
-%                                                                           ^^^^^^^^
-%                                                            Truyền pool_pmi, nhận pmi1/pmi2
 
 % =========================================================================
 % IN PMI CỦA CẶP UE ĐƯỢC CHỌN

@@ -11,7 +11,7 @@ NumUEs = 20000;
 
 % Cấu hình Codebook cho 4 Port (P_CSI-RS = 2 * N1 * N2 = 4)
 cfg.CodeBookConfig.CodebookType = 'typeII-r16';
-cfg.CodeBookConfig.N1 = 2;
+cfg.CodeBookConfig.N1 = 4;
 cfg.CodeBookConfig.N2 = 1; 
 
 % Bắt buộc paramCombination = 1 hoặc 2 khi cấu hình 4 Port
@@ -45,6 +45,12 @@ poolConfig.kmeansMaxIter  = 100;
 
 disp('--- Running K-Means to build Representative Pool ---');
 [W_pool, pool_indices, pool_pmi] = buildRepresentativePool(W_all, UE_Reported_Indices, poolConfig);
+
+W1 = W_pool(:, :, 1);
+W2 = W_pool(:, :, 2);
+disp(W1);
+disp(W2);
+disp(abs(PMIPair(W1, W2)));
 
 % TÌM CẶP UE TRỰC GIAO NHẤT TRONG TOÀN BỘ POOL
 % =========================================================================

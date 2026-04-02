@@ -5,49 +5,19 @@ setupPath();
 ALL_Case = [
     % Case 1: Default
     struct('desc', 'Case 1: Default', ...
-           'NLAYERS', 2, 'MCS', 12, ...
+           'NLAYERS', 1, 'MCS', 27, ...
            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
            'NSLOT', 0, 'NFRAME', 0, 'NCELL_ID', 20, ...
            'DMRS_CONFIGURATION_TYPE', 1, 'DMRS_TYPEA_POSITION', 2, 'DMRS_NUMCDMGROUP_WITHOUT_DATA', 2, ...
            'DMRS_LENGTH', 1, 'DMRS_ADDITIONAL_POSITION', 1, ...
            'PDSCH_MAPPING_TYPE', 'A', 'PDSCH_RNTI', 20000, 'PDSCH_PRBSET', 0:272, 'PDSCH_START_SYMBOL', 0, ...
-           'FILE_NAME', 'PDSCH_Waveform_4P1V_Matran025');
+           'FILE_NAME', 'Case0_PDSCH_Waveform_4P1V');
 ];
 
+% Config Port
+N1 = 2; N2 = 1; O1 = 4; O2 = 1;
 
-SUBBAND_AMPLITUDE = true;
-N1 = 4; N2 = 1; O1 = 4; O2 = 1;
-NUMBER_OF_BEAMS = 2;
-PHASE_ALPHABET_SIZE = 4;
-
-i11 = [1 0];
-i12 = 2;
-
-i13 = [3; 2];
-
-i14 = [2 7 0 3;
-       6 1 3 3];
-
-i21 = [1 3 0 0;
-       2 2 0 0];
-
-i22 = [1 1 1 1;
-       1 1 1 1];
-
-for caseIdx = 1:length(ALL_Case)
-    % -----------------------------------------------------------------
-    % Codebook Configuration
-    % -----------------------------------------------------------------
-    cfg = struct();
-    cfg.N1 = N1;
-    cfg.N2 = N2;
-    cfg.O1 = O1;
-    cfg.O2 = O2;
-    cfg.NumberOfBeams = NUMBER_OF_BEAMS;      
-    cfg.PhaseAlphabetSize = PHASE_ALPHABET_SIZE; 
-    cfg.SubbandAmplitude = SUBBAND_AMPLITUDE;
-    cfg.numLayers = ALL_Case(caseIdx).NLAYERS;   
-
+for caseIdx = 1:length(ALL_Case)   
     % -----------------------------------------------------------------
     % Carrier Configuration
     % -----------------------------------------------------------------
@@ -65,8 +35,6 @@ for caseIdx = 1:length(ALL_Case)
     % PDSCH Configuration
     % -----------------------------------------------------------------
     pdsch = customPDSCHConfig(); 
-
-    pdsch.CodebookConfig = cfg;
     
     pdsch.DMRS.DMRSConfigurationType     = ALL_Case(caseIdx).DMRS_CONFIGURATION_TYPE; 
     pdsch.DMRS.DMRSTypeAPosition         = ALL_Case(caseIdx).DMRS_TYPEA_POSITION; 
@@ -85,18 +53,12 @@ for caseIdx = 1:length(ALL_Case)
     % In this code using TABLE 2
     pdsch = pdsch.setMCS(ALL_Case(caseIdx).MCS);
 
-    pdsch.Indices.i1 = {i11, i12, i13, i14};
-    pdsch.Indices.i2 = {i21, i22};
-
     % -----------------------------------------------------------------
     % Generate Bits
     % -----------------------------------------------------------------
     [~, pdschInfo] = nrPDSCHIndices(carrier, pdsch);
     NREPerPRB = pdschInfo.NREPerPRB;
 
-    % TBS = nrTBS(pdsch.Modulation, pdsch.NumLayers, ...
-    %             length(pdsch.PRBSet), NREPerPRB, pdsch.TargetCodeRate);
-    % Manual
     TBS = manualCalculateTBS(pdsch);
 
     inputBits = ones(TBS, 1);
@@ -108,7 +70,12 @@ for caseIdx = 1:length(ALL_Case)
     dmrsSym = genDMRS(carrier, pdsch);
     dmrsInd = DMRSIndices(pdsch, carrier);
     
-    W = generateTypeIIPrecoder(pdsch, pdsch.Indices.i1, pdsch.Indices.i2, true)
+    W = [
+        0.6325 + 0.0000i;
+        0.4472 + 0.4472i;
+       -0.0000 - 0.3162i;
+       -0.2236 + 0.2236i
+    ];
 
     frameGrid = ResourceGrid(carrier, 2 * N1 * N2);
 
@@ -145,7 +112,7 @@ for caseIdx = 1:length(ALL_Case)
     centerFreq = 0;
     nchannel = numTxPorts; 
     nFrame = 5; 
-    scs = 30000; % SCS 30kHz
+    scs = 30000; 
     data_repeat = repmat(txdata1, nFrame, 1); 
     savevsarecordingmulti(ALL_Case(caseIdx).FILE_NAME, data_repeat, NFFT*scs, centerFreq, nchannel);
 end

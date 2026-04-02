@@ -21,7 +21,7 @@ function W_vsa = vsa_normalize_matrix(varargin)
     W_vsa = W_norm.';
     
     % --- IN RA BẢNG ---
-    fprintf('\n=== MA TRAN BEAM WEIGHTS CHUAN KÊYSIGHT VSA ===\n');
+    fprintf('\n=== MA TRAN BEAM WEIGHTS CHUAN KEYSIGHT VSA ===\n');
     fprintf('Peak Magnitude (max|W|) = %.4f\n\n', max_mag);
     fprintf('%-20s', 'Name');
     for col = 1:size(W_vsa, 2)
