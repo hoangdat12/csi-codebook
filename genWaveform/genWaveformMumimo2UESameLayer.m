@@ -2,6 +2,29 @@ function outWaveform = genWaveformMumimo2UESameLayer(baseConfig, W1, W2)
     nLayers = baseConfig.NLAYERS;
     numTxPorts = size(W1, 1);
 
+    % % =================================================================
+    % % THỰC HIỆN ZERO-FORCING PRECODING ĐỂ TRIỆT NHIỄU CHÉO
+    % % =================================================================
+    % % 1. Giả lập kênh truyền H từ ma trận Codebook W
+    % H1_est = W1'; % Kích thước: [nLayers x numTxPorts]
+    % H2_est = W2'; % Kích thước: [nLayers x numTxPorts]
+
+    % % 2. Ghép kênh truyền tổng hợp của cả hệ thống MU-MIMO
+    % H_total = [H1_est; H2_est]; % Kích thước: [(2*nLayers) x numTxPorts]
+
+    % % 3. Tính toán ma trận Zero-Forcing bằng giả nghịch đảo (Pseudo-inverse)
+    % W_ZF_total = pinv(H_total); 
+
+    % % 4. Chuẩn hóa công suất (CỰC KỲ QUAN TRỌNG ĐỂ DECODE QAM)
+    % W_ZF_total = W_ZF_total / norm(W_ZF_total, 'fro'); 
+    % W_ZF_total = W_ZF_total * sqrt(size(W_ZF_total, 2)); 
+
+    % % 5. Tách ma trận ZF trả lại cho UE1 và UE2
+    % % Lúc này W1 và W2 mới thực sự trực giao với nhau
+    % W1 = W_ZF_total(:, 1:nLayers);
+    % W2 = W_ZF_total(:, nLayers+1:end);
+    % % =================================================================
+
     % -----------------------------------------------------------------
     % Carrier Configuration
     % -----------------------------------------------------------------

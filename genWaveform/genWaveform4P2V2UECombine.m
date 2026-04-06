@@ -17,18 +17,33 @@ ALL_Case = [
 % -----------------------------------------------------------------
 % Ma trận Trực giao được chọn ra từ hàm (findOrthognalW)
 % -----------------------------------------------------------------
+% W1 = [
+%      0.3536 + 0.0000i   0.3536 + 0.0000i;
+%    0.0000 - 0.3536i   0.0000 + 0.3536i;
+%    0.3536 + 0.0000i  -0.3536 + 0.0000i;
+%    0.0000 - 0.3536i   0.0000 - 0.3536i
+% ];
+
+% W2 = [
+%     0.3536 + 0.0000i   0.3536 + 0.0000i;
+%    0.0000 + 0.3536i   0.0000 - 0.3536i;
+%    0.3536 + 0.0000i  -0.3536 + 0.0000i;
+%    0.0000 + 0.3536i   0.0000 + 0.3536i
+% ];
+
 W1 = [
-    0.4619 - 0.1633i   0.4444 + 0.0000i;
-   -0.4619 - 0.1633i  -0.4444 + 0.0000i;
-   -0.0000 - 0.1394i   0.2222 - 0.0556i;
-    0.0000 - 0.0239i  -0.2222 - 0.0556i
+    0.5714 - 0.0000i  -0.2857 + 0.0000i;
+  -0.0000 + 0.0000i  -0.2020 - 0.2020i;
+  -0.2857 - 0.0714i   0.4041 + 0.0714i;
+   0.2525 + 0.1515i   0.3362 + 0.2352i
 ];
 
+
 W2 = [
-    0.2132 - 0.1066i  -0.0845 - 0.0845i;
-    0.2132 + 0.1066i  -0.0845 + 0.0845i;
-    0.4264 + 0.1066i   0.4781 + 0.0845i;
-    0.4264 - 0.1066i   0.4781 - 0.0845i
+     0.0000 + 0.0000i   0.2872 - 0.0000i;
+   0.4061 + 0.4061i   0.2031 + 0.2031i;
+   0.3380 + 0.0000i   0.4569 - 0.0000i;
+  -0.1672 - 0.1672i   0.2513 + 0.2513i
 ];
 
 vsa_normalize_matrix(W1, W2);
@@ -40,9 +55,9 @@ score = PMIPair(W1, W2);
 fprintf(' * Giá trị phức (Complex)::: %8.4f %+.4fi\n', real(score), imag(score));
 fprintf(' * Biên độ tuyệt đối (Abs)::: %8.4f\n\n', abs(score));
 
-outWaveforms = cell(length(ALL_Case), 1);
+% outWaveforms = cell(length(ALL_Case), 1);
 
-for caseIdx = 1:length(ALL_Case)
-    baseConfig = ALL_Case(caseIdx);
-    outWaveforms{caseIdx} = genWaveformMumimo2UESameLayer(baseConfig, W1, W2);
-end
+% for caseIdx = 1:length(ALL_Case)
+%     baseConfig = ALL_Case(caseIdx);
+%     outWaveforms{caseIdx} = genWaveformMumimo2UESameLayer(baseConfig, W1, W2);
+% end

@@ -7,7 +7,7 @@ setupPath();
 
 nLayers = 4;
 
-config.CodeBookConfig.N1 = 2;
+config.CodeBookConfig.N1 = 4;
 config.CodeBookConfig.N2 = 1;
 config.CodeBookConfig.cbMode = 1;
 
@@ -91,7 +91,7 @@ function [W_all, UE_Reported_Indices] = prepareData(config, nLayers)
     nPort = 2 * N1 * N2; % Số cổng anten
     
     % Tự động tạo tên file dựa trên cấu hình (ví dụ: Precoding_4Port4Layer_CBModeN1N2_121.txt)
-    filename = sprintf('Precoding_%dPort%dLayer_CBModeN1N2_%d%d%d.txt', nPort, nLayers, cbMode, N1, N2);
+    filename = sprintf('Precoding_8Port4Layer_CBModeN1N2_141.txt', nPort, nLayers, cbMode, N1, N2);
     
     fprintf('Đang đọc ma trận precoder W_all từ file: %s...\n', filename);
     

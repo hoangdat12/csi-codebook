@@ -15,7 +15,7 @@ prepareDataConfig.N2                = 1;
 prepareDataConfig.O1                = 4;
 prepareDataConfig.O2                = 4;
 prepareDataConfig.L                 = 2;
-prepareDataConfig.NumLayers         = 1;
+prepareDataConfig.NumLayers         = 2;
 prepareDataConfig.subbandAmplitude  = true;
 prepareDataConfig.PhaseAlphabetSize = 4;
 
@@ -29,12 +29,18 @@ disp('--- Generating data for 20,000 UEs (32T32R) ---');
 % 3. Pre-Processing: Build representative UE pool via K-Means clustering
 % =========================================================================
 poolConfig = struct();
-poolConfig.numClusters    = 50;
-poolConfig.targetPoolSize = 200;
+poolConfig.numClusters    = 500;
+poolConfig.targetPoolSize = 2000;
 poolConfig.kmeansMaxIter  = 100;
 
 disp('--- Running K-Means to build Representative Pool ---');
 [W_pool, pool_indices, pool_pmi] = buildRepresentativePool(W_all, UE_Reported_Indices, poolConfig);
+
+fprintf("Choose Random PMI\n");
+disp(W_pool(:, :, 1));
+disp(W_pool(:, :, 2));
+
+disp(abs(PMIPair(W_pool(:,:,1), W_pool(:,:,2))));
 
 % =========================================================================
 % 4. PHY Layer Configuration — 32T32R
@@ -107,7 +113,7 @@ function [ue1_idx, ue2_idx, W1, W2, bestScore, pmi1, pmi2] = findBestOrthogonalP
     fprintf('\n========================================\n');
     fprintf('  Best orthogonal pair found:\n');
     fprintf('  UE %d  vs  UE %d\n', ue1_idx, ue2_idx);
-    fprintf('  Score = %.6f\n', bestScore);
+    fprintf('  Score = %.15f\n', bestScore);
     fprintf('========================================\n');
 
     fprintf('W1 (UE %d):\n', ue1_idx); disp(W1);
@@ -157,23 +163,38 @@ function printPMI(pmi, ue_idx)
 end
 
 function [W_all, UE_Reported_Indices] = prepareData(config)
-
-    % --- Read configuration fields (with default values) ---
+    % --- Đọc thông số ---
     Num_UEs           = getField(config, 'Num_UEs',           20000);
-    N1                = getField(config, 'N1',                4);
+    N1                = getField(config, 'N1',                2); % 32T32R tuỳ config của bác
     N2                = getField(config, 'N2',                1);
     O1                = getField(config, 'O1',                4);
-    O2                = getField(config, 'O2',                1);
+    O2                = getField(config, 'O2',                4);
     L                 = getField(config, 'L',                 2);
-    NumLayers         = getField(config, 'NumLayers',         1);
+    NumLayers         = getField(config, 'NumLayers',         2);
     subbandAmplitude  = getField(config, 'subbandAmplitude',  true);
-    PhaseAlphabetSize = getField(config, 'PhaseAlphabetSize', 8);
+    PhaseAlphabetSize = getField(config, 'PhaseAlphabetSize', 4);
 
-    % --- Generate random PMI indices for all UEs ---
-    fprintf('Generating PMI configuration for %d UEs...\n', Num_UEs);
+    % --- 1. SINH 1 BỘ PMI NGẪU NHIÊN ĐỂ LẤY CHUẨN W1 ---
+    fprintf('Đang lấy 1 cấu hình W1 chuẩn để chốt cứng...\n');
+    dummy_PMI = randomPMIConfig(1, N1, N2, O1, O2, L, NumLayers, subbandAmplitude);
+    
+    % %%% CỐ ĐỊNH W1 TẠI ĐÂY %%%
+    % Trích xuất đúng cái i1 của nó ra làm chuẩn mực cho toàn bộ hệ thống
+    FIXED_i1 = dummy_PMI{1}.i1; 
+    disp('Cấu hình i1 (W1) đã được chốt cứng:');
+    disp(FIXED_i1);
+
+    % --- 2. TẠO 20.000 UE NHƯNG BẮT DÙNG CHUNG W1 ---
+    fprintf('Tạo %d UEs (Chung W1, ngẫu nhiên W2)...\n', Num_UEs);
     UE_Reported_Indices = randomPMIConfig(Num_UEs, N1, N2, O1, O2, L, NumLayers, subbandAmplitude);
+    
+    for u = 1:Num_UEs
+        % Ép toàn bộ UE phải xài chung cái FIXED_i1 này
+        % Các UE giờ chỉ khác nhau ở biến i2 (W2)
+        UE_Reported_Indices{u}.i1 = FIXED_i1; 
+    end
 
-    % --- Build cfg struct for generateTypeIIPrecoder ---
+    % --- 3. TÍNH TOÁN MA TRẬN W TỔNG ---
     cfg = struct();
     cfg.CodebookConfig.N1                = N1;
     cfg.CodebookConfig.N2                = N2;
@@ -184,18 +205,17 @@ function [W_all, UE_Reported_Indices] = prepareData(config)
     cfg.CodebookConfig.SubbandAmplitude  = subbandAmplitude;
     cfg.CodebookConfig.numLayers         = NumLayers;
 
-    % --- Compute precoder matrix W_all for all UEs ---
     Num_Antennas = 2 * N1 * N2;
     W_all = zeros(Num_Antennas, NumLayers, Num_UEs);
 
-    fprintf('Computing precoder matrix W_all...\n');
+    fprintf('Đang tính toán ma trận W cho tất cả UEs...\n');
     for u = 1:Num_UEs
         indices_ue = UE_Reported_Indices{u};
+        % Vì i1 giống hệt nhau, hàm này bản chất là sinh ra W dựa trên W1 cố định và W2 khác nhau
         W_all(:, :, u) = generateTypeIIPrecoder(cfg, indices_ue.i1, indices_ue.i2);
     end
-    fprintf('W_all completed: [%d x %d x %d]\n\n', size(W_all));
-
-end % end prepareData
+    fprintf('Hoàn tất tính toán W: [%d x %d x %d]\n\n', size(W_all));
+end
 
 function [W_pool, pool_indices, pool_pmi] = buildRepresentativePool(W_all, UE_Reported_Indices, config)
 % Thêm output pool_pmi và input UE_Reported_Indices

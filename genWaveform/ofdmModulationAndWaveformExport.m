@@ -18,11 +18,24 @@ function outWaveform = ofdmModulationAndWaveformExport(frameGrid, fileName, W)
     end
     fprintf('Kích thước sau OFDM (1 Frame) [Số mẫu x Số Port]::: %d x %d\n\n', size(txdata1, 1), size(txdata1, 2));
 
+    % =========================================================================
+    % THÊM NHIỄU AWGN ĐỂ HẠ SNR
+    % =========================================================================
+    snr_dB = 10; % Điều chỉnh mức SNR tại đây (VD: 30 dB (sạch), 15 dB (nhiễu vừa), 5 dB (rất nhiễu))
+    
+    % Thêm nhiễu vào tín hiệu, MATLAB tự động đo công suất bằng cờ 'measured'
+    txdata1_noisy = awgn(txdata1, snr_dB, 'measured');
+    
+    fprintf('Đã thêm nhiễu AWGN với mức SNR mục tiêu = %d dB\n\n', snr_dB);
+    % =========================================================================
+
     centerFreq = 0;
     nchannel = numTxPorts; 
     nFrame = 5; 
     scs = 30000; % SCS 30kHz
-    data_repeat = repmat(txdata1, nFrame, 1); 
+    
+    data_repeat = repmat(txdata1_noisy, nFrame, 1); 
+    % data_repeat = repmat(txdata1, nFrame, 1); 
 
     outWaveform = data_repeat;
 
