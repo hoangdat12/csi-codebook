@@ -1,0 +1,196 @@
+% % Khởi tạo ma trận W1 và W2
+% W1 = [
+%    0.1768 + 0.0000i   0.1768 + 0.0000i   0.1768 + 0.0000i   0.1768 + 0.0000i;
+%   -0.1768 + 0.0000i   0.0000 - 0.1768i  -0.1768 + 0.0000i   0.0000 - 0.1768i;
+%    0.1768 + 0.0000i  -0.1768 + 0.0000i   0.1768 + 0.0000i  -0.1768 + 0.0000i;
+%   -0.1768 + 0.0000i   0.0000 + 0.1768i  -0.1768 + 0.0000i   0.0000 + 0.1768i;
+%    0.0000 + 0.1768i   0.0000 + 0.1768i   0.0000 - 0.1768i   0.0000 - 0.1768i;
+%    0.0000 - 0.1768i   0.1768 + 0.0000i   0.0000 + 0.1768i  -0.1768 + 0.0000i;
+%    0.0000 + 0.1768i   0.0000 - 0.1768i   0.0000 - 0.1768i   0.0000 + 0.1768i;
+%    0.0000 - 0.1768i  -0.1768 + 0.0000i   0.0000 + 0.1768i   0.1768 + 0.0000i
+% ];
+
+% W2 = [
+%    0.1768 + 0.0000i   0.1768 + 0.0000i   0.1768 + 0.0000i   0.1768 + 0.0000i;
+%    0.0000 + 0.1768i   0.1768 + 0.0000i   0.0000 + 0.1768i   0.1768 + 0.0000i;
+%   -0.1768 + 0.0000i   0.1768 + 0.0000i  -0.1768 + 0.0000i   0.1768 + 0.0000i;
+%    0.0000 - 0.1768i   0.1768 + 0.0000i   0.0000 - 0.1768i   0.1768 + 0.0000i;
+%    0.0000 + 0.1768i   0.0000 + 0.1768i   0.0000 - 0.1768i   0.0000 - 0.1768i;
+%   -0.1768 + 0.0000i   0.0000 + 0.1768i   0.1768 + 0.0000i   0.0000 - 0.1768i;
+%    0.0000 - 0.1768i   0.0000 + 0.1768i   0.0000 + 0.1768i   0.0000 - 0.1768i;
+%    0.1768 + 0.0000i   0.0000 + 0.1768i  -0.1768 + 0.0000i   0.0000 - 0.1768i
+% ];
+
+% % Thiết lập tham số
+% theta = linspace(-pi/2, pi/2, 500); % Quét từ -90 đến 90 độ
+% d_lambda = 0.5;                     % Khoảng cách ăng-ten d = lambda/2
+
+% figure('Name', 'MIMO Beam Patterns', 'Position', [100, 100, 1000, 500]);
+
+% % ==================== Vẽ ma trận W1 ====================
+% subplot(1, 2, 1);
+% polaraxes; hold on;
+% for col = 1:4
+%     w = W1(:, col);
+%     w_pol1 = w(1:4); % 4 port cho phân cực 1
+%     w_pol2 = w(5:8); % 4 port cho phân cực 2
+    
+%     AF_pol1 = zeros(size(theta));
+%     AF_pol2 = zeros(size(theta));
+    
+%     % Tính Array Factor (AF) cho từng phần tử
+%     for n = 0:3
+%         phase_shift = 2 * pi * d_lambda * n * sin(theta);
+%         AF_pol1 = AF_pol1 + w_pol1(n+1) * exp(1i * phase_shift);
+%         AF_pol2 = AF_pol2 + w_pol2(n+1) * exp(1i * phase_shift);
+%     end
+    
+%     % Tổng hợp công suất (dB)
+%     Total_Pattern = abs(AF_pol1).^2 + abs(AF_pol2).^2;
+%     Pattern_dB = 10 * log10(Total_Pattern + 1e-10);
+    
+%     % Cắt sàn nhiễu ở -20dB để đồ thị gọn gàng
+%     Pattern_dB = max(Pattern_dB, -20); 
+    
+%     polarplot(theta, Pattern_dB, 'LineWidth', 1.5, 'DisplayName', ['Cột ', num2str(col)]);
+% end
+
+% % Format đồ thị W1
+% ax = gca;
+% ax.ThetaZeroLocation = 'top';     % 0 độ chĩa lên trên
+% ax.ThetaDir = 'clockwise';        % Chiều dương theo chiều kim đồng hồ
+% ax.ThetaLim = [-90 90];           % Chỉ hiển thị từ -90 tới 90 độ
+% ax.RLim = [-20 5];                % Giới hạn bán kính dB
+% title('Hướng Beam - Ma trận W1');
+% legend('Location', 'best');
+% hold off;
+
+% % ==================== Vẽ ma trận W2 ====================
+% subplot(1, 2, 2);
+% polaraxes; hold on;
+% for col = 1:4
+%     w = W2(:, col);
+%     w_pol1 = w(1:4);
+%     w_pol2 = w(5:8);
+    
+%     AF_pol1 = zeros(size(theta));
+%     AF_pol2 = zeros(size(theta));
+    
+%     for n = 0:3
+%         phase_shift = 2 * pi * d_lambda * n * sin(theta);
+%         AF_pol1 = AF_pol1 + w_pol1(n+1) * exp(1i * phase_shift);
+%         AF_pol2 = AF_pol2 + w_pol2(n+1) * exp(1i * phase_shift);
+%     end
+    
+%     Total_Pattern = abs(AF_pol1).^2 + abs(AF_pol2).^2;
+%     Pattern_dB = 10 * log10(Total_Pattern + 1e-10);
+%     Pattern_dB = max(Pattern_dB, -20);
+    
+%     polarplot(theta, Pattern_dB, 'LineWidth', 1.5, 'DisplayName', ['Cột ', num2str(col)]);
+% end
+
+% % Format đồ thị W2
+% ax = gca;
+% ax.ThetaZeroLocation = 'top';
+% ax.ThetaDir = 'clockwise';
+% ax.ThetaLim = [-90 90];
+% ax.RLim = [-20 5];
+% title('Hướng Beam - Ma trận W2');
+% legend('Location', 'best');
+% hold off;
+
+% Khởi tạo ma trận W1, W2, và W3
+W1 = [
+   0.1768 + 0.0000i   0.1768 + 0.0000i   0.1768 + 0.0000i   0.1768 + 0.0000i;
+  -0.1768 + 0.0000i   0.0000 - 0.1768i  -0.1768 + 0.0000i   0.0000 - 0.1768i;
+   0.1768 + 0.0000i  -0.1768 + 0.0000i   0.1768 + 0.0000i  -0.1768 + 0.0000i;
+  -0.1768 + 0.0000i   0.0000 + 0.1768i  -0.1768 + 0.0000i   0.0000 + 0.1768i;
+   0.0000 + 0.1768i   0.0000 + 0.1768i   0.0000 - 0.1768i   0.0000 - 0.1768i;
+   0.0000 - 0.1768i   0.1768 + 0.0000i   0.0000 + 0.1768i  -0.1768 + 0.0000i;
+   0.0000 + 0.1768i   0.0000 - 0.1768i   0.0000 - 0.1768i   0.0000 + 0.1768i;
+   0.0000 - 0.1768i  -0.1768 + 0.0000i   0.0000 + 0.1768i   0.1768 + 0.0000i
+];
+
+W2 = [
+   0.1768 + 0.0000i   0.1768 + 0.0000i   0.1768 + 0.0000i   0.1768 + 0.0000i;
+   0.0000 + 0.1768i   0.1768 + 0.0000i   0.0000 + 0.1768i   0.1768 + 0.0000i;
+  -0.1768 + 0.0000i   0.1768 + 0.0000i  -0.1768 + 0.0000i   0.1768 + 0.0000i;
+   0.0000 - 0.1768i   0.1768 + 0.0000i   0.0000 - 0.1768i   0.1768 + 0.0000i;
+   0.0000 + 0.1768i   0.0000 + 0.1768i   0.0000 - 0.1768i   0.0000 - 0.1768i;
+  -0.1768 + 0.0000i   0.0000 + 0.1768i   0.1768 + 0.0000i   0.0000 - 0.1768i;
+   0.0000 - 0.1768i   0.0000 + 0.1768i   0.0000 + 0.1768i   0.0000 - 0.1768i;
+   0.1768 + 0.0000i   0.0000 + 0.1768i  -0.1768 + 0.0000i   0.0000 - 0.1768i
+];
+
+% Khởi tạo W3 (mô phỏng một bộ trọng số khác)
+W3 = [
+   0.1768 + 0.0000i  -0.1768 + 0.0000i   0.1768 + 0.0000i  -0.1768 + 0.0000i;
+  -0.0000 - 0.1768i   0.0000 + 0.1768i  -0.0000 - 0.1768i   0.0000 + 0.1768i;
+  -0.1768 + 0.0000i   0.1768 + 0.0000i  -0.1768 + 0.0000i   0.1768 + 0.0000i;
+   0.0000 + 0.1768i  -0.0000 - 0.1768i   0.0000 + 0.1768i  -0.0000 - 0.1768i;
+   0.1768 + 0.0000i   0.1768 + 0.0000i  -0.1768 + 0.0000i  -0.1768 + 0.0000i;
+  -0.0000 - 0.1768i  -0.0000 - 0.1768i   0.0000 + 0.1768i   0.0000 + 0.1768i;
+  -0.1768 + 0.0000i  -0.1768 + 0.0000i   0.1768 + 0.0000i   0.1768 + 0.0000i;
+   0.0000 + 0.1768i   0.0000 + 0.1768i  -0.0000 - 0.1768i  -0.0000 - 0.1768i
+];
+
+% Gom các ma trận W vào cell array để xử lý vòng lặp
+W_list = {W1, W2, W3};
+W_names = {'W1', 'W2', 'W3'};
+
+% Thiết lập tham số
+theta = linspace(-pi/2, pi/2, 500); 
+d_lambda = 0.5;                     
+
+% Định vị 3 UE
+ue_angles_deg = [-30, 10, 40]; 
+ue_angles_rad = deg2rad(ue_angles_deg);
+
+% Tạo figure với chiều ngang rộng hơn để chứa 3 đồ thị
+figure('Name', 'MIMO Beam Patterns with 3 UEs', 'Position', [50, 100, 1500, 500]);
+
+% ==================== Vòng lặp vẽ 3 ma trận W ====================
+for plot_idx = 1:3
+    subplot(1, 3, plot_idx);
+    polaraxes; hold on;
+    
+    W_current = W_list{plot_idx};
+    
+    for col = 1:4
+        w = W_current(:, col);
+        w_pol1 = w(1:4); 
+        w_pol2 = w(5:8); 
+        
+        AF_pol1 = zeros(size(theta));
+        AF_pol2 = zeros(size(theta));
+        
+        for n = 0:3
+            phase_shift = 2 * pi * d_lambda * n * sin(theta);
+            AF_pol1 = AF_pol1 + w_pol1(n+1) * exp(1i * phase_shift);
+            AF_pol2 = AF_pol2 + w_pol2(n+1) * exp(1i * phase_shift);
+        end
+        
+        Total_Pattern = abs(AF_pol1).^2 + abs(AF_pol2).^2;
+        Pattern_dB = 10 * log10(Total_Pattern + 1e-10);
+        Pattern_dB = max(Pattern_dB, -20);
+        
+        polarplot(theta, Pattern_dB, 'LineWidth', 1.5, 'DisplayName', ['Cột ', num2str(col)]);
+    end
+    
+    % Vẽ vị trí của 3 UE
+    for i = 1:length(ue_angles_rad)
+        polarplot([ue_angles_rad(i) ue_angles_rad(i)], [-20 5], 'k--', 'LineWidth', 1, 'HandleVisibility', 'off');
+        polarplot(ue_angles_rad(i), 5, 'p', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'r', 'MarkerSize', 12, 'HandleVisibility', 'off');
+    end
+    polarplot(0, -20, 'p', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'r', 'MarkerSize', 10, 'DisplayName', 'UEs');
+    
+    % Format đồ thị
+    ax = gca;
+    ax.ThetaZeroLocation = 'top';
+    ax.ThetaDir = 'clockwise';
+    ax.ThetaLim = [-90 90];
+    ax.RLim = [-20 5];
+    title(['Hướng Beam - Ma trận ', W_names{plot_idx}]);
+    legend('Location', 'best');
+    hold off;
+end

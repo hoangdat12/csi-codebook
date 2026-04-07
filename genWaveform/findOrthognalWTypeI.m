@@ -8,8 +8,9 @@ setupPath();
 nLayers = 4;
 
 config.CodeBookConfig.N1 = 4;
-config.CodeBookConfig.N2 = 1;
+config.CodeBookConfig.N2 = 2;
 config.CodeBookConfig.cbMode = 1;
+config.FileName = "Precoding_16Port4Layer_CBModeN1N2_142.txt";
 
 % 3. Gọi hàm để đọc dữ liệu từ file
 % Đảm bảo file .txt đang nằm cùng thư mục với script đang chạy
@@ -29,57 +30,253 @@ disp('--- Running K-Means to build Representative Pool ---');
 % TÌM CẶP UE TRỰC GIAO NHẤT TRONG TOÀN BỘ POOL
 % =========================================================================
 fprintf('\n[Pre-search] Finding most orthogonal UE pair in pool...\n');
-[ue1, ue2, W1, W2, pairDist, pmi1, pmi2] = findBestOrthogonalPair(W_pool, pool_pmi);
+[best_ue_idx, best_W, bestScore, best_pmi] = findBestOrthogonalGroup(W_pool, pool_pmi, 3);
 
 
 % =========================================================================
 % LOCAL FUNCTIONS 
 % =========================================================================
-function [ue1_idx, ue2_idx, W1, W2, bestScore, pmi1, pmi2] = findBestOrthogonalPair(W_pool, pool_pmi)
-% pool_pmi: cell array {1 x NUE}, mỗi phần tử là struct indices của UE đó
+function [best_ue_idx, best_W, bestScore, best_pmi] = findBestOrthogonalGroup(W_pool, pool_pmi, num_users_to_group, maxIter)
+    % Cài đặt maxIter mặc định nếu không truyền vào
+    if nargin < 4
+        maxIter = 50; 
+    end
 
-    NUE = size(W_pool, 3);
+    % 1. Gọi thuật toán SOS để tìm lịch trình ghép nhóm cho toàn bộ UEs
+    fprintf('[GroupSearch] Running SOS Algorithm for faster grouping...\n');
+    [bestGroups, ~] = sosMUMIMOScheduling(W_pool, num_users_to_group, maxIter);
 
+    % 2. Tìm nhóm xuất sắc nhất trong các nhóm mà SOS đã tạo ra 
+    % (Sử dụng tiêu chí Max-Min giống hàm gốc của bạn)
     bestScore = -inf;
-    ue1_idx   = -1;
-    ue2_idx   = -1;
+    best_ue_idx = [];
 
-    fprintf('[PairSearch] Scanning %d UE pairs...\n', NUE*(NUE-1)/2);
-
-    for i = 1:NUE-1
-        for j = i+1:NUE
-            Wi = W_pool(:, :, i);
-            Wj = W_pool(:, :, j);
-
-            score = chordalDistance(Wi, Wj);
-
-            if score > bestScore
-                bestScore = score;
-                ue1_idx   = i;
-                ue2_idx   = j;
+    numGroups = length(bestGroups);
+    for g = 1:numGroups
+        current_group = bestGroups{g};
+        min_dist_in_group = inf;
+        
+        % Tính khoảng cách chordal nhỏ nhất trong nhóm này
+        for i = 1:num_users_to_group-1
+            for j = i+1:num_users_to_group
+                u1 = current_group(i);
+                u2 = current_group(j);
+                dist = chordalDistance(W_pool(:,:,u1), W_pool(:,:,u2));
+                if dist < min_dist_in_group
+                    min_dist_in_group = dist;
+                end
             end
+        end
+        
+        % Cập nhật nếu nhóm này có min_dist tốt hơn
+        if min_dist_in_group > bestScore
+            bestScore = min_dist_in_group;
+            best_ue_idx = current_group;
         end
     end
 
-    W1   = W_pool(:, :, ue1_idx);
-    W2   = W_pool(:, :, ue2_idx);
-    pmi1 = pool_pmi{ue1_idx};   % <-- PMI struct của UE1
-    pmi2 = pool_pmi{ue2_idx};   % <-- PMI struct của UE2
+    % 3. Trích xuất đầu ra khớp với hàm cũ
+    best_W = W_pool(:, :, best_ue_idx);
+    best_pmi = pool_pmi(best_ue_idx);
 
     % =====================================================================
     % In kết quả
     % =====================================================================
     fprintf('\n========================================\n');
-    fprintf('  Best orthogonal pair found:\n');
-    fprintf('  UE %d  vs  UE %d\n', ue1_idx, ue2_idx);
-    fprintf('  Chordal Distance = %.6f\n', bestScore);
+    fprintf('  Best orthogonal group found via SOS (Size = %d):\n', num_users_to_group);
+    fprintf('  UEs: %s\n', num2str(best_ue_idx));
+    fprintf('  Min Chordal Distance in group = %.6f\n', bestScore);
     fprintf('  (1 = hoàn toàn trực giao, 0 = hoàn toàn tương quan)\n');
     fprintf('========================================\n');
 
-    fprintf('\nChordalDistance(W1, W2) = %.6f\n', chordalDistance(W1, W2));
+    for k = 1:num_users_to_group
+        ue_id = best_ue_idx(k);
+        fprintf('\nW%d (UE %d):\n', k, ue_id);
+        disp(W_pool(:, :, ue_id));
+    end
+end
 
-    fprintf('W1 (UE %d):\n', ue1_idx); disp(W1);
-    fprintf('W2 (UE %d):\n', ue2_idx); disp(W2);
+function [bestGroups, bestScore] = sosMUMIMOScheduling(W_all, groupSize, maxIter)
+    % Get number of UE in the Cell
+    NUE = size(W_all, 3);
+    
+    % Size of each group
+    popSize = 30; 
+
+    % The total number of groups
+    numGroups = floor(NUE / groupSize);
+    
+    % Initialize the population: Each organism is a random permutation of UE indices
+    population = zeros(popSize, NUE);
+    for p = 1:popSize
+        population(p, :) = randperm(NUE);
+    end
+    
+    % Precompute the distance matrix (Symmetric Matrix) to minimize recalculation overhead
+    disp('      [SOS] Computing distance matrix...');
+    distMat = zeros(NUE, NUE);
+    for i = 1:NUE-1
+        for j = i+1:NUE
+            distMat(i, j) = chordalDistance(W_all(:,:,i), W_all(:,:,j));
+            distMat(j, i) = distMat(i, j); 
+        end
+    end
+    
+    % Initialize the function handle for fitness evaluation
+    fitnessFunc = @(perm) computeScheduleFitnessOptimize(perm, distMat, groupSize, numGroups);
+    
+    fitness = zeros(popSize, 1);
+    for p = 1:popSize
+        fitness(p) = fitnessFunc(population(p, :));
+    end
+    
+    % Identify the initial best organism
+    [bestScore, bestIdx] = max(fitness);
+    bestPerm = population(bestIdx, :);
+    
+    no_improve_counter = 0;
+    % Early stopping condition: No improvement after 15 iterations
+    max_no_improve = 15; 
+    
+    disp('      [SOS] Starting evolutionary generations...');
+    for iter = 1:maxIter        
+        % ===== MUTUALISM PHASE =====
+        for i = 1:popSize
+            j = randi(popSize);
+            while j == i, j = randi(popSize); end
+            
+            % Crossover between organism i and j
+            newOrgI = mutualismSwap(population(i,:), population(j,:));
+            newOrgJ = mutualismSwap(population(j,:), population(i,:));
+            
+            % Update if the new organism has a higher score (better orthogonality)
+            fI = fitnessFunc(newOrgI);
+            if fI > fitness(i)
+                population(i,:) = newOrgI;
+                fitness(i) = fI;
+            end
+            
+            fJ = fitnessFunc(newOrgJ);
+            if fJ > fitness(j)
+                population(j,:) = newOrgJ;
+                fitness(j) = fJ;
+            end
+        end
+        
+        % ===== COMMENSALISM PHASE =====
+        for i = 1:popSize
+            j = randi(popSize);
+            while j == i, j = randi(popSize); end
+            
+            % Random mutation on organism i
+            newOrg = commensalismSwap(population(i,:), population(j,:));
+            fNew = fitnessFunc(newOrg);
+            if fNew > fitness(i)
+                population(i,:) = newOrg;
+                fitness(i) = fNew;
+            end
+        end
+        
+        % ===== PARASITISM PHASE =====
+        for i = 1:popSize
+            % Perturb the internal order of a segment to create a strong mutation
+            parasite = parasitePerturb(population(i,:));
+            host = randi(popSize);
+            while host == i, host = randi(popSize); end
+            
+            % Parasite replaces the host if it has a higher fitness score
+            fParasite = fitnessFunc(parasite);
+            if fParasite > fitness(host)
+                population(host,:) = parasite;
+                fitness(host) = fParasite;
+            end
+        end
+        
+        % Check for convergence and update the global best
+        [curBest, curIdx] = max(fitness);
+        if curBest > bestScore
+            bestScore = curBest;
+            bestPerm = population(curIdx, :);
+            no_improve_counter = 0; 
+        else
+            no_improve_counter = no_improve_counter + 1;
+        end
+        
+        if no_improve_counter >= max_no_improve
+            fprintf('      [SOS] Algorithm converged early at iteration %d (Score: %.4f)\n', iter, bestScore);
+            break;
+        end
+    end
+    
+    % Extract the UE array into cell arrays based on group size
+    bestGroups = cell(numGroups, 1);
+    for g = 1:numGroups
+        idx = (g-1)*groupSize + 1 : g*groupSize;
+        bestGroups{g} = bestPerm(idx);
+    end
+end
+
+% =========================================================================
+% FITNESS FUNCTION 
+% =========================================================================
+function score = computeScheduleFitnessOptimize(perm, distMat, groupSize, numGroups)
+    totalDist = 0;
+    numPairsPerGroup = groupSize * (groupSize - 1) / 2; % Combinations of 2 within the group size
+    
+    for g = 1:numGroups
+        idx = (g-1)*groupSize + 1 : g*groupSize;
+        ueIdx = perm(idx);
+        groupDist = 0;
+        
+        % Iterate through all UE pairs in a group and accumulate the orthogonal distance
+        for a = 1:groupSize-1
+            for b = a+1:groupSize
+                groupDist = groupDist + distMat(ueIdx(a), ueIdx(b));
+            end
+        end
+        
+        totalDist = totalDist + groupDist / numPairsPerGroup;
+    end
+    % Return the average score across all scheduled groups
+    score = totalDist / numGroups;
+end
+
+% =========================================================================
+% MUTATION / CROSSOVER OPERATORS
+% =========================================================================
+function newPerm = mutualismSwap(permA, permB)
+    n = length(permA);
+    pts = sort(randperm(n, 2));
+    segment = permB(pts(1):pts(2)); % Extract a segment from organism B
+    
+    remaining = permA(~ismember(permA, segment));  % Filter out duplicate elements in A
+    
+    maxInsert = length(remaining) + 1; 
+    insertPos = randi(maxInsert);
+    
+    % Insert B's segment into a random position within the remaining parts of A
+    newPerm = [remaining(1:insertPos-1), segment, remaining(insertPos:end)];
+    
+    assert(length(newPerm) == n, 'Error: newPerm length mismatch after Swap!');
+end
+
+function newPerm = commensalismSwap(permA, ~)
+    newPerm = permA;
+    pts = randperm(length(permA), 2);
+    
+    % Swap the positions of any two elements (Point Mutation Operator)
+    temp = newPerm(pts(1));
+    newPerm(pts(1)) = newPerm(pts(2));
+    newPerm(pts(2)) = temp;
+end
+
+function parasite = parasitePerturb(perm)
+    parasite = perm;
+    n = length(perm);
+    pts = sort(randperm(n, 2));
+    
+    % Randomly scramble a sub-segment within the organism (Array Mutation Operator)
+    parasite(pts(1):pts(2)) = parasite(pts(1) + randperm(pts(2)-pts(1)+1) - 1);
 end
 
 function [W_all, UE_Reported_Indices] = prepareData(config, nLayers)
@@ -87,11 +284,11 @@ function [W_all, UE_Reported_Indices] = prepareData(config, nLayers)
     N1 = config.CodeBookConfig.N1;
     N2 = config.CodeBookConfig.N2;
     cbMode = config.CodeBookConfig.cbMode; % Cần đảm bảo cbMode có trong config
-
+    
     nPort = 2 * N1 * N2; % Số cổng anten
     
     % Tự động tạo tên file dựa trên cấu hình (ví dụ: Precoding_4Port4Layer_CBModeN1N2_121.txt)
-    filename = sprintf('Precoding_8Port4Layer_CBModeN1N2_141.txt', nPort, nLayers, cbMode, N1, N2);
+    filename = sprintf(config.FileName, nPort, nLayers, cbMode, N1, N2);
     
     fprintf('Đang đọc ma trận precoder W_all từ file: %s...\n', filename);
     
@@ -147,17 +344,21 @@ end % end prepareData
 
 function [W_pool, pool_indices, pool_pmi] = buildRepresentativePool(W_all, UE_Reported_Indices, config)
     % 1. Xử lý cấu hình an toàn (Thay thế getField để code độc lập hơn)
-    if isfield(config, 'numClusters'), numClusters = config.numClusters; else numClusters = 50; end
-    if isfield(config, 'targetPoolSize'), targetPoolSize = config.targetPoolSize; else targetPoolSize = 200; end
-    if isfield(config, 'kmeansMaxIter'), kmeansMaxIter = config.kmeansMaxIter; else kmeansMaxIter = 100; end
+    if isfield(config, 'numClusters'), numClusters = config.numClusters; 
+    else 
+        numClusters = 50; 
+    end
+    if isfield(config, 'targetPoolSize'), targetPoolSize = config.targetPoolSize; 
+    else 
+        targetPoolSize = 200; 
+    end
+    if isfield(config, 'kmeansMaxIter'), kmeansMaxIter = config.kmeansMaxIter; 
+    else 
+        kmeansMaxIter = 100; 
+    end
 
     % 2. Lấy kích thước thực tế của W_all
     [Num_Antennas, NumLayers, Num_UEs] = size(W_all);
-
-    % Kiểm tra cảnh báo nếu không đúng chuẩn 4x4 (tùy chọn)
-    if Num_Antennas ~= 4 || NumLayers ~= 4
-        warning('Đầu vào W_all có kích thước [%d x %d x %d]. Đang mong đợi ma trận 4x4.', Num_Antennas, NumLayers, Num_UEs);
-    end
 
     % 3. Đảm bảo số lượng cluster không được vượt quá số lượng ma trận thực tế
     % (Nếu file của bạn chỉ có 16 ma trận mà numClusters = 50 thì K-means sẽ báo lỗi)
