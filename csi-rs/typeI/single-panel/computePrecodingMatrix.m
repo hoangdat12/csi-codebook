@@ -15,7 +15,7 @@
 % ---------------------------------------------------------
 
 numberOfLayers = 4;
-numberOfPorts = 16;
+numberOfPorts = 32;
 folderName = 'pmiData';
 
 %% Coding Logics
@@ -69,7 +69,7 @@ actualPorts = arrayfun(@(c) 2 * c.N1 * c.N2, all_cases);
 cases = all_cases(actualPorts <= numberOfPorts);
 
 % Loop from 1 to 4 layers
-for nLayers = 1:numberOfLayers
+for nLayers = 4:numberOfLayers
     % Create Precoding Matrix Lists
     W = struct();
 
@@ -87,7 +87,7 @@ for nLayers = 1:numberOfLayers
         W.(key) = generatePrecodingMatrix( ...
             c.N1, c.N2, c.O1, c.O2, nLayers, c.mode);
 
-        fileName = sprintf('Layer%d_Port%d_N1-%d_N2-%d_c%d', nLayers, port, c.N1, c.N2, c.mode);    
+        fileName = sprintf('Layer%d_Port%d_N1_%d_N2-%d_c%d.txt', nLayers, port, c.N1, c.N2, c.mode);    
 
         % Export data into txt file.
         exportData(nLayers, W, c, folderName, fileName);
@@ -149,9 +149,6 @@ function exportData(nLayers, W, c, folderName, fileName)
         error('Không thể mở file để ghi: %s', all_cases_file);
     end
 
-    fprintf(fid, 'TỔNG HỢP PRECODING MATRICES - LAYER %d\n', nLayers);
-    fprintf(fid, '============================================================\n\n');
-
     % ---- Có i13 hay không ----
     hasI13 = (nLayers >= 2);
 
@@ -166,50 +163,7 @@ function exportData(nLayers, W, c, folderName, fileName)
 
     pmiCell = W.(key);
 
-    % ---- Header case ----
-    fprintf(fid, ...
-        'CASE: %d Layers - %d Ports - N1 = %d N2 = %d O1 = %d O2 = %d Mode = %d\n', ...
-        nLayers, port, c.N1, c.N2, c.O1, c.O2, c.mode);
-
-    fprintf(fid, '\n------------------------- PARAMETERS -----------------------\n');
-
-    [i11_max, i12_max, i13_max, i2_max] = ...
-        findRangeValues(c.N1, c.N2, c.O1, c.O2, nLayers, c.mode);
-
-    rI11 = 0:i11_max;
-    rI12 = 0:i12_max;
-    rI2  = 0:i2_max;
-
-    if i13_max >= 0
-        rI13 = 0:i13_max;
-    else
-        rI13 = [];
-    end
-
-    printSet(fid, 'i11', rI11);
-    printSet(fid, 'i12', rI12);
-
-    if ~isempty(rI13)
-        printSet(fid, 'i13', rI13);
-    end
-
-    printSet(fid, 'i2', rI2);
-
-    fprintf(fid, '\n------------------------- PMI TABLES -----------------------\n\n');
-
-
-    % ---- Header bảng ----
-    if hasI13
-        fprintf(fid, '%-6s %-4s %-4s %-4s %-4s | %s\n', ...
-                'PMI','i11','i12','i13','i2','W');
-    else
-        fprintf(fid, '%-6s %-4s %-4s %-4s | %s\n', ...
-                'PMI','i11','i12','i2','W');
-    end
-
-    fprintf(fid, '------------------------------------------------------------\n');
-
-    % ---- Loop từng PMI ----
+    % ---- Vòng lặp xuất Data chuẩn hóa cho prepareData ----
     for pmiIdx = 1:length(pmiCell)
 
         entry  = pmiCell{pmiIdx};
@@ -219,61 +173,179 @@ function exportData(nLayers, W, c, folderName, fileName)
         i12 = entry.i12;
         i2  = entry.i2;
 
+        % 1. Ghi dòng Info (Hàm prepareData sẽ gán dòng này vào pool_info)
         if hasI13
             i13 = entry.i13;
+            fprintf(fid, 'PMI_Index: %d, i11: %d, i12: %d, i13: %d, i2: %d\n', pmiIdx-1, i11, i12, i13, i2);
+        else
+            fprintf(fid, 'PMI_Index: %d, i11: %d, i12: %d, i2: %d\n', pmiIdx-1, i11, i12, i2);
         end
 
         [numPorts, numL] = size(matrix);
 
+        % 2. Ghi nPort dòng ma trận (Hàm prepareData sẽ dùng vòng for đọc số dòng này)
         for p = 1:numPorts
-
-            if p == 1
-                if hasI13
-                    fprintf(fid, '%-6d %-4d %-4d %-4d %-4d |', ...
-                            pmiIdx-1, i11, i12, i13, i2);
-                else
-                    fprintf(fid, '%-6d %-4d %-4d %-4d |', ...
-                            pmiIdx-1, i11, i12, i2);
-                end
-            else
-                if hasI13
-                    fprintf(fid, '%-6s %-4s %-4s %-4s %-4s |', ...
-                            '', '', '', '', '');
-                else
-                    fprintf(fid, '%-6s %-4s %-4s %-4s |', ...
-                            '', '', '', '');
-                end
-            end
-
             for L = 1:numL
                 val = matrix(p, L);
-                fprintf(fid, ' %8.4f %+8.4fi', real(val), imag(val));
+                
+                % Định dạng số phức KHÔNG CÓ KHOẢNG TRẮNG ở giữa (vd: 0.123456+0.123456i) 
+                % Độ chính xác .6f để giữ nguyên năng lượng Beamforming
+                fprintf(fid, '%.6f%+.6fi', real(val), imag(val));
 
+                % Cách các Layer bằng một khoảng tab (dễ nhìn và chuẩn cho str2num)
                 if L < numL
-                    fprintf(fid, ',');
+                    fprintf(fid, '\t');
                 end
             end
-
+            
+            % Xuống dòng sau khi ghi xong 1 hàng của ma trận
             fprintf(fid, '\n');
         end
-
-        fprintf(fid, '\n');
+        
     end
 
     fclose(fid);
-    fprintf('Đã xuất file: %s\n', all_cases_file);
+    fprintf('Đã xuất file format MỚI thành công: %s\n', all_cases_file);
 end
 
-function printSet(fid, name, vec)
-    fprintf(fid, '%s = {', name);
-    for k = 1:length(vec)
-        if k < length(vec)
-            fprintf(fid, '%d, ', vec(k));
-        else
-            fprintf(fid, '%d', vec(k));
-        end
-    end
-    fprintf(fid, '}\n');
-end
+% function exportData(nLayers, W, c, folderName, fileName)
+
+%     % Create folder
+%     if ~exist(folderName, 'dir')
+%         mkdir(folderName);
+%     end
+
+%     all_cases_file = fullfile(folderName, fileName);
+%     fid = fopen(all_cases_file, 'w');
+%     if fid == -1
+%         error('Không thể mở file để ghi: %s', all_cases_file);
+%     end
+
+%     fprintf(fid, 'TỔNG HỢP PRECODING MATRICES - LAYER %d\n', nLayers);
+%     fprintf(fid, '============================================================\n\n');
+
+%     % ---- Có i13 hay không ----
+%     hasI13 = (nLayers >= 2);
+
+%     % ---- Thông tin case ----
+%     port = 2 * c.N1 * c.N2;
+%     key  = sprintf('L%d_P%d_N1_%d_c%d', nLayers, port, c.N1, c.mode);
+
+%     if ~isfield(W, key)
+%         fclose(fid);
+%         return;
+%     end
+
+%     pmiCell = W.(key);
+
+%     % ---- Header case ----
+%     fprintf(fid, ...
+%         'CASE: %d Layers - %d Ports - N1 = %d N2 = %d O1 = %d O2 = %d Mode = %d\n', ...
+%         nLayers, port, c.N1, c.N2, c.O1, c.O2, c.mode);
+
+%     fprintf(fid, '\n------------------------- PARAMETERS -----------------------\n');
+
+%     [i11_max, i12_max, i13_max, i2_max] = ...
+%         findRangeValues(c.N1, c.N2, c.O1, c.O2, nLayers, c.mode);
+
+%     rI11 = 0:i11_max;
+%     rI12 = 0:i12_max;
+%     rI2  = 0:i2_max;
+
+%     if i13_max >= 0
+%         rI13 = 0:i13_max;
+%     else
+%         rI13 = [];
+%     end
+
+%     printSet(fid, 'i11', rI11);
+%     printSet(fid, 'i12', rI12);
+
+%     if ~isempty(rI13)
+%         printSet(fid, 'i13', rI13);
+%     end
+
+%     printSet(fid, 'i2', rI2);
+
+%     fprintf(fid, '\n------------------------- PMI TABLES -----------------------\n\n');
+
+
+%     % ---- Header bảng ----
+%     if hasI13
+%         fprintf(fid, '%-6s %-4s %-4s %-4s %-4s | %s\n', ...
+%                 'PMI','i11','i12','i13','i2','W');
+%     else
+%         fprintf(fid, '%-6s %-4s %-4s %-4s | %s\n', ...
+%                 'PMI','i11','i12','i2','W');
+%     end
+
+%     fprintf(fid, '------------------------------------------------------------\n');
+
+%     % ---- Loop từng PMI ----
+%     for pmiIdx = 1:length(pmiCell)
+
+%         entry  = pmiCell{pmiIdx};
+%         matrix = entry.matrix;
+
+%         i11 = entry.i11;
+%         i12 = entry.i12;
+%         i2  = entry.i2;
+
+%         if hasI13
+%             i13 = entry.i13;
+%         end
+
+%         [numPorts, numL] = size(matrix);
+
+%         for p = 1:numPorts
+
+%             if p == 1
+%                 if hasI13
+%                     fprintf(fid, '%-6d %-4d %-4d %-4d %-4d |', ...
+%                             pmiIdx-1, i11, i12, i13, i2);
+%                 else
+%                     fprintf(fid, '%-6d %-4d %-4d %-4d |', ...
+%                             pmiIdx-1, i11, i12, i2);
+%                 end
+%             else
+%                 if hasI13
+%                     fprintf(fid, '%-6s %-4s %-4s %-4s %-4s |', ...
+%                             '', '', '', '', '');
+%                 else
+%                     fprintf(fid, '%-6s %-4s %-4s %-4s |', ...
+%                             '', '', '', '');
+%                 end
+%             end
+
+%             for L = 1:numL
+%                 val = matrix(p, L);
+%                 fprintf(fid, ' %8.4f %+8.4fi', real(val), imag(val));
+
+%                 if L < numL
+%                     fprintf(fid, ',');
+%                 end
+%             end
+
+%             fprintf(fid, '\n');
+%         end
+
+%         fprintf(fid, '\n');
+%     end
+
+%     fclose(fid);
+%     fprintf('Đã xuất file: %s\n', all_cases_file);
+% end
+
+% function printSet(fid, name, vec)
+%     fprintf(fid, '%s = {', name);
+%     for k = 1:length(vec)
+%         if k < length(vec)
+%             fprintf(fid, '%d, ', vec(k));
+%         else
+%             fprintf(fid, '%d', vec(k));
+%         end
+%     end
+%     fprintf(fid, '}\n');
+% end
 
 

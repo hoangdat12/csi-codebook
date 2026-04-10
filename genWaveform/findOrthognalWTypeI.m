@@ -5,12 +5,13 @@
 clear; clc; close all; 
 setupPath();
 
-nLayers = 4;
+nLayers = 2;
+numberOfUeToGroup = 2;
 
 config.CodeBookConfig.N1 = 4;
-config.CodeBookConfig.N2 = 2;
+config.CodeBookConfig.N2 = 1;
 config.CodeBookConfig.cbMode = 1;
-config.FileName = "Precoding_16Port4Layer_CBModeN1N2_142.txt";
+config.FileName = "Precoding_8Port2Layer_CBModeN1N2_141.txt";
 
 % 3. Gọi hàm để đọc dữ liệu từ file
 % Đảm bảo file .txt đang nằm cùng thư mục với script đang chạy
@@ -30,15 +31,14 @@ disp('--- Running K-Means to build Representative Pool ---');
 % TÌM CẶP UE TRỰC GIAO NHẤT TRONG TOÀN BỘ POOL
 % =========================================================================
 fprintf('\n[Pre-search] Finding most orthogonal UE pair in pool...\n');
-[best_ue_idx, best_W, bestScore, best_pmi] = findBestOrthogonalGroup(W_pool, pool_pmi, 3);
-
+[best_ue_idx, best_W, bestScore, best_pmi] = findBestOrthogonalGroup(W_pool, pool_pmi, numberOfUeToGroup);
 
 % =========================================================================
 % LOCAL FUNCTIONS 
 % =========================================================================
 function [best_ue_idx, best_W, bestScore, best_pmi] = findBestOrthogonalGroup(W_pool, pool_pmi, num_users_to_group, maxIter)
     % Cài đặt maxIter mặc định nếu không truyền vào
-    if nargin < 4
+    if nargin < 5
         maxIter = 50; 
     end
 
@@ -88,11 +88,15 @@ function [best_ue_idx, best_W, bestScore, best_pmi] = findBestOrthogonalGroup(W_
     fprintf('  Min Chordal Distance in group = %.6f\n', bestScore);
     fprintf('  (1 = hoàn toàn trực giao, 0 = hoàn toàn tương quan)\n');
     fprintf('========================================\n');
-
     for k = 1:num_users_to_group
         ue_id = best_ue_idx(k);
         fprintf('\nW%d (UE %d):\n', k, ue_id);
         disp(W_pool(:, :, ue_id));
+        % plotBeamDirection(W_pool(:,:,ue_id), config.CodeBookConfig.N1, config.CodeBookConfig.N2);
+    end
+
+    for pmiIdx = 1:num_users_to_group 
+        disp(best_pmi(pmiIdx));
     end
 end
 
@@ -246,15 +250,29 @@ end
 % =========================================================================
 function newPerm = mutualismSwap(permA, permB)
     n = length(permA);
-    pts = sort(randperm(n, 2));
-    segment = permB(pts(1):pts(2)); % Extract a segment from organism B
     
-    remaining = permA(~ismember(permA, segment));  % Filter out duplicate elements in A
+    pt1 = randi(n);
+    pt2 = randi(n);
+    while pt1 == pt2
+        pt2 = randi(n); % Đảm bảo 2 điểm không trùng nhau
+    end
+    
+    if pt1 < pt2
+        idx1 = pt1; idx2 = pt2;
+    else
+        idx1 = pt2; idx2 = pt1;
+    end
+    
+    segment = permB(idx1:idx2); % Trích xuất một đoạn từ sinh vật B
+    
+    isInSegment = false(1, n); 
+    isInSegment(segment) = true; % Đánh dấu 'true' cho những UE có trong segment
+    
+    remaining = permA(~isInSegment(permA));  
     
     maxInsert = length(remaining) + 1; 
     insertPos = randi(maxInsert);
     
-    % Insert B's segment into a random position within the remaining parts of A
     newPerm = [remaining(1:insertPos-1), segment, remaining(insertPos:end)];
     
     assert(length(newPerm) == n, 'Error: newPerm length mismatch after Swap!');

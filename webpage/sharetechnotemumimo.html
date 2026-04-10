@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>5G NR Type I Codebook Visualizer — 3GPP 38.214</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --bg:       #060910;
+    --panel:    #0c1018;
+    --border:   #1a2540;
+    --accent:   #00e5ff;
+    --accent2:  #ff4444;
+    --accent3:  #44ff88;
+    --text:     #c8d6e8;
+    --muted:    #4a6080;
+    --blue:     #4488ff;
+    --red:      #ff3333;
+    --green:    #44cc44;
+    --header-h: 44px;
+    --ctrl-w:   260px;
+    --font-mono:'Share Tech Mono', monospace;
+    --font-ui:  'Rajdhani', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── HEADER ────────────────────────────── */
+  #header {
+    height: var(--header-h);
+    background: #080d14;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 14px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  #header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: .4;
+  }
+  .hdr-logo {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--accent);
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .hdr-logo span { color: var(--muted); }
+  .hdr-sep { width: 1px; height: 22px; background: var(--border); }
+  .hdr-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: .1em;
+  }
+  .hdr-badge {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 2px 8px;
+    border-radius: 2px;
+    opacity: .7;
+  }
+
+  /* ── LAYOUT ─────────────────────────────── */
+  #cb5g-root {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* ── LEFT CONTROL PANEL ─────────────────── */
+  #ctrl-panel {
+    width: var(--ctrl-w);
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  #ctrl-panel::-webkit-scrollbar { width: 4px; }
+  #ctrl-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .ctrl-section {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+  }
+  .ctrl-section-title {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: .15em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .ctrl-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 100px;
+  }
+  .ctrl-label sub { font-size: 9px; }
+
+  select, input[type=number] {
+    background: #0a1020;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    border-radius: 2px;
+    outline: none;
+  }
+  select {
+    padding: 3px 6px;
+    flex: 1;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%234a6080' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    padding-right: 22px;
+  }
+  select:focus { border-color: var(--accent); }
+
+  input[type=number] {
+    flex: 1;
+    padding: 4px 8px;
+    width: 0;
+  }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type=number]:focus { border-color: var(--accent); color: var(--accent); }
+
+  /* Legend */
+  .legend-row {
+    display: flex;
+    gap: 14px;
+    margin-top: 4px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--muted);
+  }
+  .legend-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── MAIN CANVAS AREA ───────────────────── */
+  #main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  /* top row: 3D + 2D polars */
+  #top-row {
+    flex: 0 0 60%; /* Cố định chiếm đúng 70% chiều cao */
+    display: flex;
+    min-height: 0;
+    border-bottom: 1px solid var(--border);
+    overflow-y: auto; /* Bổ sung cái này để cuộn nếu đồ thị Top bị quá khổ */
+  }
+
+  /* 2D polar panels container */
+    #polar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: row; /* CHUYỂN TỪ COLUMN SANG ROW ĐỂ NẰM NGANG */
+    width: 100%;
+    }
+
+    /* Từng panel con */
+    .polar-panel {
+    flex: 1; /* CHIA ĐÔI TỶ LỆ (mỗi bên 50%) */
+    width: 50%; /* Đảm bảo chia đôi tuyệt đối */
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border); /* Đổi viền dưới thành viền phải để ngăn cách 2 bên */
+    min-height: 0;
+    }
+
+    /* Xóa viền phải của panel cuối cùng để giao diện gọn gàng */
+    .polar-panel:last-child { 
+    border-right: none; 
+    }
+  .polar-panel:last-child { border-bottom: none; }
+  .polar-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    background: #09101a;
+    flex-shrink: 0;
+  }
+  .polar-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: .1em;
+    flex: 1;
+  }
+  .polar-canvas-wrap {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+  }
+  canvas.polar-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /*Bottom row*/
+  /* ── BOTTOM ROW: matrix + reference table ── */
+  #bottom-row {
+    flex: 0 0 40%; /* Cố định chiếm đúng 30% chiều cao */
+    display: flex;
+    
+    /* Nếu bên trong là Flex dàn ngang các Layer, hãy cho cuộn ngang */
+    overflow-x: auto; 
+    overflow-y: hidden;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="hdr-logo">5G NR <span>|</span> Type I Codebook</div>
+  <div class="hdr-sep"></div>
+  <div class="hdr-tag">3GPP TS 38.214 — Single-Panel DFT Beamforming</div>
+  <div class="hdr-badge">RANK 1 / RANK 2 / RANK 4</div>
+</div>
+
+<!-- ROOT -->
+<div id="cb5g-root">
+
+  <!-- LEFT CONTROL PANEL -->
+  <div id="ctrl-panel">
+
+    <div class="ctrl-section">
+      <div class="ctrl-section-title">Codebook Table</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Table</div>
+        <select id="cb5g-table-select"></select>
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Sub-table</div>
+        <select id="cb5g-subtable-select"></select>
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-section-title">Array Config</div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Config (N1 × N2)</div>
+        <select id="cb5g-config"></select>
+      </div>
+      <div class="ctrl-row">
+        <div class="ctrl-label">Rank</div>
+        <select id="cb5g-rank">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-section-title">Legend</div>
+      <div class="legend-row">
+        <div class="legend-item"><div class="legend-dot" style="background:#4488ff"></div>Layer 1</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ff4444"></div>Layer 2</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#44cc44"></div>Layer 1</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#ffaa33"></div>Layer 2</div>
+      </div>
+    </div>
+
+    <div class="ctrl-section" id="mu-mimo-dynamic-configs">
+        <div class="ctrl-section-title" style="color: #ff4444; margin-bottom: 10px;">
+            MU-MIMO Global PMIs
+        </div>
+        
+        <div class="ctrl-row" style="padding:5px; margin-bottom:6px; border:1px solid #ffdddd;">
+            <div class="ctrl-label">UE 1</div>
+            <input type="number" id="cb5g-pmi-global-ue1" min="0" value="0" />
+        </div>
+
+        <div class="ctrl-row" style="padding:5px; margin-bottom:6px; border:1px solid #ffdddd;">
+            <div class="ctrl-label">UE 2</div>
+            <input type="number" id="cb5g-pmi-global-ue2" min="0" value="0" />
+        </div>
+    </div>
+
+    <a href="sharetechnote.html" style="padding: 10px 20px; margin: 10px 0px; background-color: blue; color: white; text-decoration: none; border-radius: 5px;">
+        SU-MIMO
+    </a>
+
+    <button id="btn-toggle-plane" style="padding: 10px 20px; margin: 10px 0px; background-color: #333; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">
+        ELEVATION 
+    </button>
+  </div><!-- /ctrl-panel -->
+
+  <!-- MAIN AREA -->
+  <div id="main-area">
+
+    <!-- TOP ROW: 3D + 2D polars -->
+    <div id="top-row">
+      <!-- 2D POLAR PANELS -->
+      <div id="polar-col">
+        <div class="polar-panel">
+          <div class="polar-toolbar">
+            <span class="polar-label">AZIMUTH SLICE (XY-PLANE)</span>
+            <button class="scale-btn" id="polarAzimuthScaleBtn" style="margin-left:auto">
+              <span class="cb5g-icon-lin" style="display:none">→ dB</span>
+              <span class="cb5g-icon-db">→ Lin</span>
+            </button>
+          </div>
+          <div class="polar-canvas-wrap">
+            <canvas id="polarAzimuth" class="polar-canvas"></canvas>
+          </div>
+        </div>
+        <div class="polar-panel">
+          <div class="polar-toolbar">
+            <span class="polar-label">ELEVATION SLICE (XZ-PLANE)</span>
+            <button class="scale-btn" id="polarElevationScaleBtn" style="margin-left:auto">
+              <span class="cb5g-icon-lin" style="display:none">→ dB</span>
+              <span class="cb5g-icon-db">→ Lin</span>
+            </button>
+          </div>
+          <div class="polar-canvas-wrap">
+            <canvas id="polarElevation" class="polar-canvas"></canvas>
+          </div>
+        </div>
+      </div><!-- /polar-col -->
+
+    </div><!-- /top-row -->
+
+    <!-- BOTTOM ROW -->
+    <div id="bottom-row">
+      <div id="polar-col-each-layer">
+        <div class="polar-panel-each-layer">
+          <div class="polar-toolbar-each-layer">
+            <span class="polar-label-each-layer">AZIMUTH SLICE (XY-PLANE)</span>
+          </div>
+          <div class="polar-canvas-wrap-each-layers">
+            <canvas id="polarAzimuth-each-layer" class="polar-canvas-each-layer"></canvas>
+          </div>
+        </div>
+      </div><!-- /polar-col -->
+    </div><!-- /bottom-row -->
+
+  </div><!-- /main-area -->
+</div><!-- /cb5g-root -->
+
+
+
+<!-- MAIN VISUALIZER SCRIPT (the provided JS) -->
+<script src="sharetechnotemumimo.js"></script>
+
+<!-- Fallback: if running from file:// paste JS inline -->
+<!-- <script> paste JS content here if needed </script> -->
+
+</body>
+</html>
