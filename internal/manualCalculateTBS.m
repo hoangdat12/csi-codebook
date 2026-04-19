@@ -46,6 +46,7 @@ function TBS = manualCalculateTBS(pdsch)
 
     % Tính N_info theo công thức
     NInfo = numRE * pdsch.TargetCodeRate * Qm * pdsch.NumLayers;
+    disp(NInfo);
 
     % ---------------------------------------------------------------------
     % 4. Tra bảng và tính TBS (Giữ nguyên logic chuẩn của bạn)
