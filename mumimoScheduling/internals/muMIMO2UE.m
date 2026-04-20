@@ -1,4 +1,17 @@
 function [BER1, BER2] = muMIMO2UE(baseConfig, W1, W2, SNR_dB) 
+% This function is a pipeline for mesurement the BER of transmit MUMIMO 2 UE.
+%
+% W1 and W2 must satisfy the orthogonality threshold (chordal distance
+%     >= 0.9999) since the Tx/Rx chain does not apply ZF or MMSE interference
+%     cancellation between UEs. Insufficient orthogonality will cause
+%     inter-user interference and degrade BER directly.
+%
+% Pipeline: TX -> AWGN Channel -> RX
+%
+    
+    % ------------------------------------------------------------------------
+    % Conver the output to the Configuration
+    % ------------------------------------------------------------------------
     nLayers = baseConfig.NLAYERS;
 
     carrier = nrCarrierConfig;
@@ -41,17 +54,37 @@ function [BER1, BER2] = muMIMO2UE(baseConfig, W1, W2, SNR_dB)
     pdsch2.DMRS.DMRSPortSet = 4:7;
     pdsch2.DMRS.NSCID       = 0;
 
-    % ── Encode ───────────────────────────────────────────────────────────
+    % ------------------------------------------------------------------------
+    % Based on the pdsch Configuration, calculate the Transport Block Size - TBS
+    % This parameters is the maximum data bits of PDSCH.
+    % ------------------------------------------------------------------------
     TBS1       = manualCalculateTBS(pdsch1);
     TBS2       = manualCalculateTBS(pdsch2);
     inputBits1 = ones(TBS1, 1);
     inputBits2 = zeros(TBS2, 1);
 
+    % ------------------------------------------------------------------------
+    % This is the process of encapsulate the TB Data from MAC -> PDSCH
+    % The process include: CRC Attach -> Base Graph Selection -> Segmentation
+    %   -> LDPC Encoded -> Rate Matching -> Scrambling -> Modulation 
+    %   -> Layer Mapping 
+    % ------------------------------------------------------------------------
     [layerMappedSym1, pdschInd1] = myPDSCHEncode(pdsch1, carrier, inputBits1);
     [layerMappedSym2, pdschInd2] = myPDSCHEncode(pdsch2, carrier, inputBits2);
 
+    % ------------------------------------------------------------------------
+    % Generate DMRS for each PDSCH channel. This signal use at the RX side for 
+    %   estimate the channel and decoded the PDSCH data.
+    % ------------------------------------------------------------------------
     dmrsSym1 = genDMRS(carrier, pdsch1);   dmrsInd1 = DMRSIndices(pdsch1, carrier);
     dmrsSym2 = genDMRS(carrier, pdsch2);   dmrsInd2 = DMRSIndices(pdsch2, carrier);
+
+    % ------------------------------------------------------------------------
+    % Antenna Port Mapping And Resource Mapping
+    % This step use the output after the Layer Mapping and multiply with 
+    %   Precoding Matrix, The matrix use the Type I CSI-RS Codebook.
+    % This simulation doesn't use Interleaving between VRB and PRB.
+    % ------------------------------------------------------------------------
 
     % ── Resource grid (manual, supports any nPorts) ───────────────────────
     nPorts        = size(W1, 1); 
@@ -74,60 +107,72 @@ function [BER1, BER2] = muMIMO2UE(baseConfig, W1, W2, SNR_dB)
         layerGrid_UE2(dmrsInd2(:,layer))  = dmrsSym2(:,layer);
     end
 
-    layerFlat_UE1   = reshape(layerGrid_UE1, K*symbolsPerSlot, nLayers1);
-    layerFlat_UE2   = reshape(layerGrid_UE2, K*symbolsPerSlot, nLayers2);
-    portFlat_UE1    = layerFlat_UE1 * W1.';   % [K*T x nPorts]
-    portFlat_UE2    = layerFlat_UE2 * W2.';
-    portFlat        = portFlat_UE1 + portFlat_UE2;
+    % Flatten layer grids and apply precoding matrices
+    layerFlat_UE1 = reshape(layerGrid_UE1, K*symbolsPerSlot, nLayers1);
+    layerFlat_UE2 = reshape(layerGrid_UE2, K*symbolsPerSlot, nLayers2);
+    portFlat_UE1  = layerFlat_UE1 * W1.';  % [K*T x nPorts]
+    portFlat_UE2  = layerFlat_UE2 * W2.';
+    portFlat      = portFlat_UE1 + portFlat_UE2;  % superimpose both UEs
 
-    portGrid        = reshape(portFlat, K, symbolsPerSlot, nPorts);
+    portGrid = reshape(portFlat, K, symbolsPerSlot, nPorts);
 
+    % ------------------------------------------------------------------------
+    % OFDM Modulation - 30kHZ - 4096 NFFT
+    % ------------------------------------------------------------------------
     txdataF_test  = subcarrierMap(portGrid(:,:,1), NFFT);
     txTest        = ofdmModulation(txdataF_test, NFFT);
-    samplePerSlot = length(txTest);          % lấy size thực từ hàm của bạn
+    samplePerSlot = length(txTest);
     txWaveform    = zeros(samplePerSlot, nPorts);
-    for p = 1:nPorts
-        txdataF_p        = subcarrierMap(portGrid(:,:,p), NFFT);
-        txWaveform(:, p) = ofdmModulation(txdataF_p, NFFT);
-    end
+
+    % OFDM modulate all ports
     for p = 1:nPorts
         txdataF_p        = subcarrierMap(portGrid(:,:,p), NFFT);  % [NFFT x nSymbols]
         txWaveform(:, p) = ofdmModulation(txdataF_p, NFFT);
     end
 
+    % ------------------------------------------------------------------------
+    % AWGN Channels
+    % ------------------------------------------------------------------------
     if nargin < 4 || isempty(SNR_dB)
-        rxWaveform = txWaveform;
-        noiseVarEst = eps; % Phương sai nhiễu cực nhỏ
+        % Noiseless path: pass signal through unchanged
+        rxWaveform  = txWaveform;
+        noiseVarEst = eps;
     else
-        % Nếu có SNR, thêm nhiễu AWGN
-        rxWaveform = awgn(txWaveform, SNR_dB, 'measured');
-        
-        % Tính toán noise variance tương đối để đưa vào MMSE
-        % (Sức mạnh tín hiệu / Sức mạnh nhiễu)
+        % Add AWGN and estimate noise variance for the MMSE equalizer
+        rxWaveform  = awgn(txWaveform, SNR_dB, 'measured');
         signalPower = mean(abs(txWaveform(:)).^2);
         noisePower  = signalPower / (10^(SNR_dB/10));
-        noiseVarEst = noisePower; 
+        noiseVarEst = noisePower;
     end
 
-    % ── RX Decode ─────────────────────────────────────────────────────────
-    % Cập nhật hàm rxPDSCHDecode để nhận thêm rxWaveform và noiseVarEst
+    % -------------------------------------------------------------------------
+    % RX Side
+    % Decoding pipeline: RX Waveform -> OFDM Demodulation -> Extract PDSCH REs
+    %   -> DMRS-based LS Channel Estimation -> MMSE Equalization -> PDSCH Decoding
+    % -------------------------------------------------------------------------
     [rxBits1, ~] = rxPDSCHDecode(carrier, pdsch1, rxWaveform, TBS1, NFFT, noiseVarEst);
     [rxBits2, ~] = rxPDSCHDecode(carrier, pdsch2, rxWaveform, TBS2, NFFT, noiseVarEst);
 
+    % ------------------------------------------------------------------------
+    % Calculate BER of each UE in the process
+    % ------------------------------------------------------------------------
     numErrors  = biterr(double(inputBits1), double(rxBits1));
     BER1       = numErrors / TBS1;
     numErrors2 = biterr(double(inputBits2), double(rxBits2));
     BER2       = numErrors2 / TBS2;
 end
 
-% Cập nhật hàm rxPDSCHDecode thêm tham số noiseVar
 function [rxBits, eqSymbols, Hest] = rxPDSCHDecode(carrier, pdsch, rxWaveform, TBS, NFFT, noiseVar)
+% This function use to decoded the PDSCH Data at the RX side 
+% Decoding Pipeline: RX Waveform -> OFDM Demodulation -> Extract PDSCH REs
+%   -> DMRS-based LS Channel Estimation -> MMSE Equalization -> PDSCH Decoding
+
     K              = carrier.NSizeGrid * 12;
     symbolsPerSlot = carrier.SymbolsPerSlot;
     nPorts         = size(rxWaveform, 2);
     nLayers        = pdsch.NumLayers;
 
-    % ── OFDM demodulate ───────────────────────────────────────────────
+    % OFDM demodulate all receive ports
     rxGrid = zeros(K, symbolsPerSlot, nPorts);
     for p = 1:nPorts
         rxdataF_p     = ofdmDemodulation(rxWaveform(:, p), NFFT, K, ...
@@ -135,35 +180,37 @@ function [rxBits, eqSymbols, Hest] = rxPDSCHDecode(carrier, pdsch, rxWaveform, T
         rxGrid(:,:,p) = rxdataF_p(:, 1:symbolsPerSlot);
     end
 
-    % ── Lấy PDSCH RE của UE cần decode ────────────────────────────────
-    pdschInd = nrPDSCHIndices(carrier, pdsch);
+    % Extract PDSCH REs for the target UE
+    pdschInd  = nrPDSCHIndices(carrier, pdsch);
     planeSize = K * symbolsPerSlot;
 
-    % Nếu index có offset theo layer thì bỏ offset
+    % Strip layer offset if indices exceed the 2D plane size
     pdschInd2D = pdschInd(:,1);
     if any(pdschInd2D > planeSize)
-        pdschInd2D = pdschInd2D - 0*planeSize;   % cột 1 -> layer 1
+        pdschInd2D = pdschInd2D - 0*planeSize;
     end
 
-    nRE = size(pdschInd, 1);
+    nRE     = size(pdschInd, 1);
     pdschRx = zeros(nRE, nPorts);
     for p = 1:nPorts
         grid_p        = rxGrid(:,:,p);
         pdschRx(:, p) = grid_p(pdschInd2D);
     end
 
-    % ── DMRS-based channel estimation ─────────────────────────────────
+    % DMRS-based least-squares channel estimation
     HportLayer = estimateChannelFromDMRS(rxGrid, carrier, pdsch);
 
-    % Kênh lý tưởng hiện tại: replicate cho toàn bộ RE PDSCH
+    % Replicate channel estimate across all PDSCH REs
     Hest = repmat(reshape(HportLayer, [1, nPorts, nLayers]), [nRE, 1, 1]);
 
-    % Sử dụng noiseVar thực tế được truyền xuống thay vì cố định là eps
+    % MMSE equalization and PDSCH decoding
     eqSymbols = nrEqualizeMMSE(pdschRx, Hest, noiseVar);
     rxBits    = PDSCHDecode(pdsch, carrier, eqSymbols, TBS, noiseVar);
 end
 
 function HportLayer = estimateChannelFromDMRS(rxGrid, carrier, pdsch)
+% This function use to perform channels estimate based on the DMRS symbols
+
     K              = carrier.NSizeGrid * 12;
     symbolsPerSlot = carrier.SymbolsPerSlot;
     planeSize      = K * symbolsPerSlot;
@@ -171,13 +218,13 @@ function HportLayer = estimateChannelFromDMRS(rxGrid, carrier, pdsch)
     nPorts  = size(rxGrid, 3);
     nLayers = pdsch.NumLayers;
 
-    dmrsInd = DMRSIndices(pdsch, carrier);   % [nDmrsRE x nLayers]
-    dmrsTx  = genDMRS(carrier, pdsch);       % [nDmrsRE x nLayers]
+    dmrsInd = DMRSIndices(pdsch, carrier);  % [nDmrsRE x nLayers]
+    dmrsTx  = genDMRS(carrier, pdsch);      % [nDmrsRE x nLayers]
 
     HportLayer = zeros(nPorts, nLayers);
 
     for l = 1:nLayers
-        % Bỏ offset theo layer để map về mặt phẳng 2D [K x symbolsPerSlot]
+        % Strip layer offset to map indices into the 2D [K x symbolsPerSlot] plane
         ind2D = dmrsInd(:, l);
         if any(ind2D > planeSize)
             ind2D = ind2D - (l-1)*planeSize;
@@ -185,48 +232,57 @@ function HportLayer = estimateChannelFromDMRS(rxGrid, carrier, pdsch)
 
         for p = 1:nPorts
             rxTmp = rxGrid(:,:,p);
-            y = rxTmp(ind2D);
-            x = dmrsTx(:, l);
+            y     = rxTmp(ind2D);
+            x     = dmrsTx(:, l);
 
-            h_ls = y ./ x;
-            HportLayer(p, l) = mean(h_ls);
+            % Least-squares estimate per RE, averaged across DMRS pilots
+            h_ls           = y ./ x;
+            HportLayer(p,l) = mean(h_ls);
         end
     end
 end
 
 function rxdataF = ofdmDemodulation(rxdata, NFFT, K, SCS)
-    mu          = log2(SCS / 15);          % numerology
-    cp_samples0 = round(176 * NFFT / 2048);
-    cp_samples  = round(144 * NFFT / 2048);
-    nSymPerSlot = 14;                      % normal CP, one slot
+    mu          = log2(SCS / 15);           % numerology index
+    cp_samples0 = round(176 * NFFT / 2048); % extended CP (first symbol per half-slot)
+    cp_samples  = round(144 * NFFT / 2048); % normal CP
+    nSymPerSlot = 14;
+
     rxdataF = zeros(K, nSymPerSlot);
     idx     = 0;
+
     for i = 1:nSymPerSlot
+        % First symbol of each half-slot uses the extended CP length
         if mod(i, 7 * 2^mu) == 1
             cp_len = cp_samples0;
         else
             cp_len = cp_samples;
         end
+
         sym_start = idx + cp_len + 1;
         sym_end   = sym_start + NFFT - 1;
         time_sym  = rxdata(sym_start : sym_end);
         freq_sym  = fft(time_sym, NFFT);
-        half      = K / 2;
-        rxdataF(:, i) = [freq_sym(2 : half+1);                    % positive
-                         freq_sym(NFFT - half + 1 : NFFT)];       % negative
+
+        % Map positive and negative frequency bins to subcarrier grid
+        half = K / 2;
+        rxdataF(:, i) = [freq_sym(2 : half+1);              % positive frequencies
+                         freq_sym(NFFT - half + 1 : NFFT)]; % negative frequencies
         idx = idx + cp_len + NFFT;
     end
 end
 
 function txdataF = subcarrierMap(grid_K_T, NFFT)
+    % Map subcarrier grid onto NFFT-point frequency axis (DC-centered)
     [K, nSym] = size(grid_K_T);
-    half       = K / 2;
-    txdataF    = zeros(NFFT, nSym);
-    txdataF(2 : half+1,            :) = grid_K_T(1:half,      :);
-    txdataF(NFFT-half+1 : NFFT,   :) = grid_K_T(half+1:end,  :);
+    half      = K / 2;
+    txdataF   = zeros(NFFT, nSym);
+    txdataF(2 : half+1,          :) = grid_K_T(1:half,     :); % positive
+    txdataF(NFFT-half+1 : NFFT, :) = grid_K_T(half+1:end, :); % negative
 end
 
 function NFFT = computeNFFT(SCS)
-    base = 2048;  % SCS=15 kHz
+    % NFFT scales linearly with subcarrier spacing relative to 15 kHz baseline
+    base = 2048;
     NFFT = base * SCS / 15;
-end 
+end

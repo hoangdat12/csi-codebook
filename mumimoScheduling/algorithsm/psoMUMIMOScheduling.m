@@ -1,4 +1,6 @@
 function [bestGroups, bestScore] = psoMUMIMOScheduling(W_all, groupSize, maxIter)
+% This function use to Scheduling UE in the Cell using the PSO (Particle Swarm Optimization)
+%
 
     NUE      = size(W_all, 3);
     numGroups = floor(NUE / groupSize);

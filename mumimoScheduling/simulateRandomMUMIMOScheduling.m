@@ -1,6 +1,36 @@
-clear; clc; close all; 
+% =========================================================================
+% simulateRandomMUMIMOScheduling.m
+%
+% Top-level script for MU-MIMO user scheduling and BER evaluation.
+% Loads a 3GPP Type I PMI codebook, builds a representative UE pool via
+% K-Means clustering, runs PSO/SOS orthogonal group search, and evaluates
+% BER performance of the best scheduled UE pair across an SNR sweep.
+%
+% Pipeline:
+%   1. Load PMI codebook and sample numberOfUE random precoding matrices
+%   2. Cluster UEs via K-Means to build a compact representative pool
+%   3. Search for spatially orthogonal UE pairs using PSO
+%   4. Evaluate MU-MIMO BER of the first feasible pair over SNR = 0:5:30 dB
+%
+% Requirements:
+%   - setupPath.m
+%   - prepareData.m, buildRepresentativePool.m
+%   - psoMUMIMOScheduling.m (or sosMUMIMOScheduling.m)
+%   - muMIMO2UE.m, chordalDistance.m
+%   - PMI codebook file: Layer4_Port32_N1_4_N2-4_c1.txt
+%
+% Parameters (configure below):
+%   nLayers          : Number of PDSCH transmission layers
+%   numberOfUE       : Size of the synthetic UE population
+%   numberOfUeToGroup: Number of UEs per MU-MIMO group
+%   threshold        : Minimum chordal distance for a feasible pair
+% =========================================================================
+clear; clc; close all;
 setupPath();
 
+% ----------------------------------------------------------------------------
+% The configuration parameters for the test
+% ----------------------------------------------------------------------------
 nLayers = 4;
 numberOfUeToGroup = 2;
 numberOfUE = 20000;
@@ -8,10 +38,22 @@ numberOfUE = 20000;
 config.CodeBookConfig.N1 = 4;
 config.CodeBookConfig.N2 = 4;
 config.CodeBookConfig.cbMode = 1;
+
+% The file for PMI Lookup Table
 config.FileName = "Layer4_Port32_N1_4_N2-4_c1.txt";
 
+% ----------------------------------------------------------------------------
+% Papre Data 
+% Load PMI codebook from file and randomly sample numberOfUE precoding
+% matrices (with replacement) to simulate a realistic UE population.
+% Output W_all: [nPort x nLayers x numberOfUE]
+% ----------------------------------------------------------------------------
 [W_all, UE_Reported_Indices, totalPMI] = prepareData(config, nLayers, numberOfUE);
 
+
+% ----------------------------------------------------------------------------
+% Base config for this test
+% ----------------------------------------------------------------------------
 baseConfig = struct('desc', 'Case 1: Default', ...
            'NLAYERS', nLayers, 'MCS', 27, ...
            'SUBCARRIER_SPACING', 30, 'NSIZE_GRID', 273, 'CYCLIC_PREFIX', "normal", ...
@@ -22,7 +64,7 @@ baseConfig = struct('desc', 'Case 1: Default', ...
            'FILE_NAME', '2UE_Combine_PDSCH_Waveform_4P2V');
 
 % =========================================================================
-% 3. Pre-Processing: Build representative UE pool via K-Means clustering
+% Pre-Processing: Build representative UE pool via K-Means clustering
 % =========================================================================
 poolConfig = struct();
 poolConfig.numClusters = min(totalPMI, 500);
@@ -33,28 +75,30 @@ disp('--- Running K-Means to build Representative Pool ---');
 [W_pool, pool_indices, pool_pmi] = buildRepresentativePool(W_all, UE_Reported_Indices, poolConfig);
 
 % =========================================================================
-% TÌM CÁC CẶP TRỰC GIAO VÀ TEST BER
+% Find the Orthogonal PMI PAIR
 % =========================================================================
-threshold = 0.9999; % Ngưỡng trực giao
+threshold = 0.9999; 
 fprintf('\n[Pre-search] Finding feasible orthogonal UE pairs (score >= %.2f)...\n', threshold);
-
-% Gọi hàm mới của bro (Trả về danh sách các nhóm)
 [f_groups, f_W, f_scores, f_pmi] = findFeasibleOrthogonalGroups(W_pool, pool_pmi, numberOfUeToGroup, 50, threshold);
 
+
+% =========================================================================
+% BER Testing
+% =========================================================================
 if ~isempty(f_W)
-    fprintf('\n---> Đưa cặp ĐẦU TIÊN đạt chuẩn vào test BER Loopback quét dải SNR...\n');
+    fprintf('\n---> Running BER loopback test on the FIRST feasible group across SNR range...\n');
     
-    % Lấy ma trận W của nhóm ĐẦU TIÊN trong danh sách
+    % Extract precoding matrices from the first feasible group
     W_test = f_W{1}; 
 
-    % ── ĐỊNH NGHĨA DẢI SNR QUÉT ──────────────────────────────────────────
+    % SNR sweep range (dB)
     snrRange = 0:5:30; 
     
-    % Khởi tạo mảng lưu kết quả
+    % Initialize result arrays
     ber1_results = zeros(length(snrRange), 1);
     ber2_results = zeros(length(snrRange), 1);
     
-    fprintf('\n[KẾT QUẢ TEST BER MU-MIMO THEO SNR]\n');
+    fprintf('\n[MU-MIMO BER TEST RESULTS]\n');
     fprintf('SNR (dB) | BER UE 1     | BER UE 2\n');
     fprintf('----------------------------------------\n');
     
@@ -63,41 +107,38 @@ if ~isempty(f_W)
     disp(W_UE1_Codebook);
     disp(W_UE2_Codebook);
 
-    % ── VÒNG LẶP TEST SNR ────────────────────────────────────────────────
+    % SNR sweep loop
     for i = 1:length(snrRange)
         currentSNR = snrRange(i);
         
         [ber1, ber2] = muMIMO2UE(baseConfig, W_UE1_Codebook, W_UE2_Codebook, currentSNR);
         
-        % Lưu kết quả vào mảng
         ber1_results(i) = ber1;
         ber2_results(i) = ber2;
         
-        % In kết quả của từng mức SNR ra Command Window
         fprintf('%8d | %10.6f | %10.6f\n', currentSNR, ber1, ber2);
     end
     
-    % ── VẼ BIỂU ĐỒ BER (WATERFALL CURVE) ─────────────────────────────────
+    % Plot BER waterfall curves
     figure('Name', 'MU-MIMO BER Performance', 'Color', 'w');
     semilogy(snrRange, ber1_results, '-ob', 'LineWidth', 2, 'MarkerSize', 6);
     hold on;
     semilogy(snrRange, ber2_results, '-sr', 'LineWidth', 2, 'MarkerSize', 6);
     
     grid on;
-    % Bật grid phụ để nhìn log-scale rõ hơn
     set(gca, 'YMinorGrid', 'on'); 
     
     xlabel('SNR (dB)', 'FontWeight', 'bold');
     ylabel('Bit Error Rate (BER)', 'FontWeight', 'bold');
-    title('Hiệu năng BER của hệ thống MU-MIMO (2 UEs)', 'FontSize', 12);
+    title('MU-MIMO BER Performance (2 UEs)', 'FontSize', 12);
     legend('UE 1', 'UE 2', 'Location', 'southwest');
 else
-    fprintf('\n[THẤT BẠI] SOS không tìm được cặp nào đạt ngưỡng trực giao %.2f.\n', threshold);
-    fprintf('Gợi ý: Thử giảm threshold xuống 0.8 hoặc tăng targetPoolSize/maxIter lên.\n');
+    fprintf('\n[FAILED] No feasible group found with orthogonality threshold %.2f.\n', threshold);
+    fprintf('Suggestion: Try lowering the threshold to 0.8 or increasing targetPoolSize/maxIter.\n');
 end
 
 % =========================================================================
-% LOCAL FUNCTIONS 
+% HELPER FUNCTION
 % =========================================================================
 function [feasible_groups, feasible_W, feasible_scores, feasible_pmi] = findFeasibleOrthogonalGroups(W_pool, pool_pmi, num_users_to_group, maxIter, threshold)
     if nargin < 5
@@ -108,6 +149,11 @@ function [feasible_groups, feasible_W, feasible_scores, feasible_pmi] = findFeas
     end
 
     fprintf('[GroupSearch] Running SOS Algorithm...\n');
+
+        
+    % =========================================================================
+    % This step can uncomment and use one of these method for scheduling
+    % =========================================================================
     % [bestGroups, ~] = sosMUMIMOScheduling(W_pool, num_users_to_group, maxIter);
     [bestGroups, ~] = psoMUMIMOScheduling(W_pool, num_users_to_group, maxIter);
 

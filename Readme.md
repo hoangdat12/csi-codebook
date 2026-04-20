@@ -1,100 +1,80 @@
-function drawPolarPlot(canvasId, type, data) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas || !data || !data.layer1) return;
-    const parent = canvas.parentElement;
-    if (!parent || !parent.clientWidth) return;
+# MUMIMO with PDSCH channels in 5G NR using CSI-RS Codebook
+This project presents a simulation framework for PDSCH transmission in 5G NR systems, 
+with a focus on PMI (Precoding Matrix Indicator) calculation using CSI-RS-based codebooks.
 
-    const w = (canvas.width = parent.clientWidth);
-    const h = (canvas.height = parent.clientHeight);
-    const center = { x: w / 2, y: h / 2 };
-    const radius = Math.min(w, h) * 0.38;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, w, h);
+A MU-MIMO system model is considered, where multiple users are scheduled and grouped 
+using different algorithms, including Particle Swarm Optimization (PSO), 
+Symbiotic Organisms Search (SOS), and K-means clustering.
 
-    // Polar grid (concentric circles)
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    for (let r = 0.2; r <= 1; r += 0.2) {
-      ctx.beginPath();
-      ctx.arc(center.x, center.y, radius * r, 0, TAU);
-      ctx.stroke();
-    }
-    for (let a = 0; a < TAU; a += PI / 4) {
-      ctx.beginPath();
-      ctx.moveTo(center.x, center.y);
-      ctx.lineTo(center.x + radius * Math.cos(a), center.y + radius * Math.sin(a));
-      ctx.stroke();
-    }
+The study evaluates and compares the performance of these scheduling approaches 
+based on several key metrics:
+- Bit Error Rate (BER)
+- Execution time and computational complexity
+- Trade-offs between system performance and algorithm efficiency
 
-    function getRadius(gain) {
-      const scaleMode = (canvasId === 'polarAzimuth') ? polarScaleAzimuth : polarScaleElevation;
-      if (scaleMode === 'dB') {
-        const dB = 20 * Math.log10(Math.max(gain, 1e-10));
-        return Math.max(0, Math.min(1, (dB - POLAR_DB_FLOOR) / (0 - POLAR_DB_FLOOR))) * radius;
-      }
-      return gain * radius;
-    }
+The goal is to investigate the impact of advanced optimization algorithms on 
+user scheduling, precoding accuracy, and overall system throughput in 5G NR systems.
 
-    const steps = 180;
-    const layerPoints = { total: [], l1: [], l2: [] };
+## Table of Contents
+- [Overview](#overview)
+- [System Model](#system-model)
+- [Key Concepts](#key-concepts)
+  - [PDSCH Channel](#pdsch-channel)
+  - [CSI-RS and Codebook](#csi-rs-and-codebook)
+  - [PMI Calculation](#pmi-calculation)
+- [Algorithms](#algorithms)
+  - [K-means Clustering](#k-means-clustering)
+  - [Particle Swarm Optimization (PSO)](#particle-swarm-optimization-pso)
+  - [Symbiotic Organisms Search (SOS)](#symbiotic-organisms-search-sos)
+- [Simulation Setup](#simulation-setup)
+- [Performance Evaluation](#performance-evaluation)
+  - [Bit Error Rate (BER)](#bit-error-rate-ber)
+  - [Execution Time](#execution-time)
+  - [Trade-offs Analysis](#trade-offs-analysis)
+- [Project Structure](#project-structure)
+- [How to Run](#how-to-run)
+- [Results](#results)
+- [References](#references)
 
-    for (let i = 0; i <= steps; i++) {
-      let theta, phi;
-      if (type === 'azimuth') {
-        theta = PI / 2;
-        phi = (i / steps) * TAU;
-      } else {
-        theta = (i / steps) * PI;
-        phi = 0;
-      }
-      const g1 = calculateGain(theta, phi, data.layer1, data.N1, data.N2);
-      const g2 = data.layer2 ? calculateGain(theta, phi, data.layer2, data.N1, data.N2) : 0;
-      const gTotal = Math.sqrt(g1 * g1 + g2 * g2);
+## Introduction
+The rapid growth of wireless data traffic has driven the development of advanced 
+technologies in 5G New Radio (NR) systems, among which Multi-User Multiple-Input 
+Multiple-Output (MU-MIMO) plays a key role in improving spectral efficiency and 
+system capacity. By allowing simultaneous transmission to multiple users over 
+the same time-frequency resources, MU-MIMO significantly enhances network performance.
 
-      const angle = (type === 'azimuth') ? phi : theta - PI / 2;
-      function getXY(g) {
-        const rad = getRadius(g);
-        return { x: center.x + rad * Math.cos(angle), y: center.y + rad * Math.sin(angle) };
-      }
-      layerPoints.total.push(getXY(gTotal));
-      layerPoints.l1.push(getXY(g1));
-      if (data.layer2) layerPoints.l2.push(getXY(g2));
-    }
+In 5G NR, the Physical Downlink Shared Channel (PDSCH) is the primary channel 
+for downlink data transmission. Efficient precoding for PDSCH relies heavily on 
+accurate Channel State Information (CSI), which is typically obtained through 
+CSI Reference Signals (CSI-RS) and fed back in the form of codebook-based indicators, 
+such as the Precoding Matrix Indicator (PMI).
 
-    // 1. Combined power (fill + solid line)
-    ctx.beginPath();
-    layerPoints.total.forEach(function (p, i) {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
-    ctx.closePath();
-    ctx.fillStyle = (canvasId.indexOf('Azimuth') !== -1) ? 'rgba(68,136,255,0.15)' : 'rgba(255,68,68,0.15)';
-    ctx.fill();
-    ctx.strokeStyle = (canvasId.indexOf('Azimuth') !== -1) ? '#4488ff' : '#ff4444';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([]);
-    ctx.stroke();
+This project focuses on simulating the PDSCH transmission process in a MU-MIMO 
+5G NR system, with an emphasis on PMI computation using CSI-RS-based codebooks. 
+In multi-user scenarios, user scheduling and grouping become critical challenges, 
+as they directly affect interference management and overall system performance.
 
-    // 2. Layer 1 outline (dotted blue)
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    layerPoints.l1.forEach(function (p, i) {
-      if (i === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
-    ctx.strokeStyle = '#0088ff';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+To address this, different scheduling algorithms are investigated, including 
+K-means clustering, Particle Swarm Optimization (PSO), and Symbiotic Organisms 
+Search (SOS). These approaches are compared in terms of Bit Error Rate (BER), 
+execution time, and the trade-off between computational complexity and performance.
 
-    // 3. Layer 2 outline (dotted red) when Rank 2
-    if (data.layer2) {
-      ctx.beginPath();
-      layerPoints.l2.forEach(function (p, i) {
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      });
-      ctx.strokeStyle = '#ff3333';
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
-  }
+The objective of this work is to analyze how advanced optimization techniques 
+impact MU-MIMO scheduling efficiency, precoding accuracy, and overall system 
+performance in 5G NR networks.
+
+## Project Structure
+
+```bash
+csi-codebook/
+├── channel/                  # Mã nguồn chính của ứng dụng
+│   ├── components/       # Các UI components dùng chung (Button, Header...)
+│   ├── pages/            # Các trang giao diện (Home, About...)
+│   ├── utils/            # Các hàm tiện ích (helpers)
+│   └── App.js            # Entry point của ứng dụng
+├── public/               # Tài nguyên tĩnh (images, favicon, index.html)
+├── tests/                # Chứa các file unit test
+├── .gitignore            # Khai báo các file bỏ qua khi push lên Git
+├── package.json          # Khai báo thư viện và scripts (Node.js)
+└── README.md             # Tài liệu dự án
+```

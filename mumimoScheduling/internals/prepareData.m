@@ -1,22 +1,23 @@
 function [W_all, UE_Reported_Indices, totalPMI] = prepareData(config, nLayers, numberOfUE)
-    % Trích xuất thông số cấu hình
-    N1 = config.CodeBookConfig.N1;
-    N2 = config.CodeBookConfig.N2;
+    % Extract codebook configuration parameters
+    N1     = config.CodeBookConfig.N1;
+    N2     = config.CodeBookConfig.N2;
     cbMode = config.CodeBookConfig.cbMode;
-    nPort = 2 * N1 * N2;
+    nPort  = 2 * N1 * N2;
     filename = sprintf(config.FileName, nPort, nLayers, cbMode, N1, N2);
 
-    fprintf('Đang nạp "bể" ma trận (pool) từ file: %s...\n', filename);
+    fprintf('Loading precoding matrix pool from file: %s...\n', filename);
 
     fid = fopen(filename, 'r');
     if fid == -1
-        error('Không thể mở file: %s', filename);
+        error('Cannot open file: %s', filename);
     end
 
-    W_pool = [];
-    pool_info = {};
+    W_pool      = [];
+    pool_info   = {};
     pmi_in_file = 0;
 
+    % Read all precoding matrices from file
     while ~feof(fid)
         info_line = fgetl(fid);
         if ~ischar(info_line), break; end
@@ -24,7 +25,7 @@ function [W_all, UE_Reported_Indices, totalPMI] = prepareData(config, nLayers, n
 
         pmi_in_file = pmi_in_file + 1;
         pool_info{pmi_in_file} = info_line;
-        
+
         W_temp = zeros(nPort, nLayers);
         for row = 1:nPort
             row_data = fgetl(fid);
@@ -34,22 +35,18 @@ function [W_all, UE_Reported_Indices, totalPMI] = prepareData(config, nLayers, n
     end
     fclose(fid);
 
-    fprintf('Đã nạp thành công %d ma trận mẫu từ file.\n', pmi_in_file);
+    fprintf('Successfully loaded %d precoding matrices from file.\n', pmi_in_file);
 
-    % --- BƯỚC 2: LẤY MẪU NGẪU NHIÊN 20,000 CÁI TỪ POOL ---
-    fprintf('Bắt đầu lấy mẫu %d ma trận ngẫu nhiên từ bể chứa...\n', numberOfUE);
-
-    % Tạo 20,000 chỉ số ngẫu nhiên nằm trong khoảng từ 1 đến số lượng ma trận trong file
-    % Ví dụ: Nếu file có 128 ma trận, rand_idx sẽ chứa 20,000 số ngẫu nhiên từ 1-128
+    % Randomly sample numberOfUE matrices with replacement.
+    % Example: if the file contains 128 matrices, rand_idx holds
+    % numberOfUE random integers in [1, 128].
+    fprintf('Sampling %d random precoding matrices from pool...\n', numberOfUE);
     rand_idx = randi(pmi_in_file, 1, numberOfUE);
 
-    % Trích xuất nhanh bằng cách sử dụng mảng chỉ số (Vectorized Indexing)
-    W_all = W_pool(:, :, rand_idx);
-    
-    % Lấy thông tin PMI tương ứng
+    % Vectorized extraction
+    W_all               = W_pool(:, :, rand_idx);
     UE_Reported_Indices = pool_info(rand_idx);
+    totalPMI            = pmi_in_file;
 
-    totalPMI = pmi_in_file;
-
-    fprintf('Hoàn thành! W_all: [%d x %d x %d]\n\n', size(W_all, 1), size(W_all, 2), size(W_all, 3));
+    fprintf('Done. W_all: [%d x %d x %d]\n\n', size(W_all, 1), size(W_all, 2), size(W_all, 3));
 end
