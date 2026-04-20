@@ -134,9 +134,9 @@ This section provides a brief overview of the core MATLAB scripts and functions 
 To run the code and reproduce the MU-MIMO scheduling simulations, follow these steps:
 
 ### 1. Setup the Environment
-First, clone the repository to your local machine:
+First, clone the repository to your local machine, the repo ![here](https://github.com/hoangdat12/csi-codebook.git):
 ```bash
-git clone [https://github.com/hoangdat12/csi-codebook.git](https://github.com/hoangdat12/csi-codebook.git)
+git clone https://github.com/hoangdat12/csi-codebook.git
 cd csi-codebook
 ```
 
