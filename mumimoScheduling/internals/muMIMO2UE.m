@@ -95,31 +95,24 @@ function [BER1, BER2] = muMIMO2UE(baseConfig, W1, W2, SNR_dB)
         txWaveform(:, p) = ofdmModulation(txdataF_p, NFFT);
     end
 
-    nRx = 4;   
-    [rxWaveform_UE1, H1_path, H1_info] = applyCDLChannel(txWaveform, carrier, nRx, 'CDL-A', 1);
-    [rxWaveform_UE2, H2_path, H2_info] = applyCDLChannel(txWaveform, carrier, nRx, 'CDL-A', 2);
-
     if nargin < 4 || isempty(SNR_dB)
-        noiseVarEst1 = eps;
-        noiseVarEst2 = eps;
+        rxWaveform = txWaveform;
+        noiseVarEst = eps; % Phương sai nhiễu cực nhỏ
     else
-        % Tính Noise riêng biệt cho từng UE để đảm bảo độ chính xác LLR
-        signalPower1 = mean(abs(rxWaveform_UE1(:)).^2);
-        noisePower1  = signalPower1 / (10^(SNR_dB/10));
-        noiseVarEst1 = noisePower1;
+        % Nếu có SNR, thêm nhiễu AWGN
+        rxWaveform = awgn(txWaveform, SNR_dB, 'measured');
         
-        signalPower2 = mean(abs(rxWaveform_UE2(:)).^2);
-        noisePower2  = signalPower2 / (10^(SNR_dB/10));
-        noiseVarEst2 = noisePower2;
-
-        % Thêm AWGN vào mỗi UE riêng
-        rxWaveform_UE1 = awgn(rxWaveform_UE1, SNR_dB, 'measured');
-        rxWaveform_UE2 = awgn(rxWaveform_UE2, SNR_dB, 'measured');
+        % Tính toán noise variance tương đối để đưa vào MMSE
+        % (Sức mạnh tín hiệu / Sức mạnh nhiễu)
+        signalPower = mean(abs(txWaveform(:)).^2);
+        noisePower  = signalPower / (10^(SNR_dB/10));
+        noiseVarEst = noisePower; 
     end
 
     % ── RX Decode ─────────────────────────────────────────────────────────
-    [rxBits1, ~] = rxPDSCHDecode(carrier, pdsch1, rxWaveform_UE1, TBS1, NFFT, noiseVarEst1);
-    [rxBits2, ~] = rxPDSCHDecode(carrier, pdsch2, rxWaveform_UE2, TBS2, NFFT, noiseVarEst2);
+    % Cập nhật hàm rxPDSCHDecode để nhận thêm rxWaveform và noiseVarEst
+    [rxBits1, ~] = rxPDSCHDecode(carrier, pdsch1, rxWaveform, TBS1, NFFT, noiseVarEst);
+    [rxBits2, ~] = rxPDSCHDecode(carrier, pdsch2, rxWaveform, TBS2, NFFT, noiseVarEst);
 
     numErrors  = biterr(double(inputBits1), double(rxBits1));
     BER1       = numErrors / TBS1;
@@ -236,29 +229,4 @@ end
 function NFFT = computeNFFT(SCS)
     base = 2048;  % SCS=15 kHz
     NFFT = base * SCS / 15;
-end
-
-%% ── applyCDLChannel.m ────────────────────────────────────────────────────
-function [rxWaveform, pathGains, pathFilters] = applyCDLChannel(txWaveform, carrier, nRx, profile, seed)
-    % txWaveform: [nSamples x nTx]  nTx=32
-    % rxWaveform: [nSamples x nRx]
-
-    nTx = size(txWaveform, 2);   % 32
-    SCS = carrier.SubcarrierSpacing * 1e3;   % Hz
-    sampleRate = computeNFFT(carrier.SubcarrierSpacing) * SCS;
-
-    cdl = nrCDLChannel;
-    cdl.DelayProfile        = profile;          % 'CDL-A'
-    cdl.DelaySpread         = 30e-9;            % 30 ns
-    cdl.CarrierFrequency    = 3.5e9;            % 3.5 GHz (FR1)
-    cdl.MaximumDopplerShift = 5;                % 5 Hz (UE tốc độ thấp)
-    cdl.SampleRate          = sampleRate;
-    cdl.TransmitAntennaArray.Size  = [nTx, 1, 1, 1, 1];
-    cdl.ReceiveAntennaArray.Size   = [nRx, 1, 1, 1, 1];
-    cdl.NormalizePathGains  = true;
-    cdl.NormalizeChannelOutputs = false;
-    cdl.RandomStream        = 'mt19937ar with seed';
-    cdl.Seed                = seed * 100;       % seed khác nhau cho UE1/UE2
-
-    [rxWaveform, pathGains, pathFilters] = cdl(txWaveform);
-end
+end 
