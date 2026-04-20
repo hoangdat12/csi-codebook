@@ -67,14 +67,28 @@ performance in 5G NR networks.
 
 ```bash
 csi-codebook/
-├── channel/                  # Mã nguồn chính của ứng dụng
-│   ├── components/       # Các UI components dùng chung (Button, Header...)
-│   ├── pages/            # Các trang giao diện (Home, About...)
-│   ├── utils/            # Các hàm tiện ích (helpers)
-│   └── App.js            # Entry point của ứng dụng
-├── public/               # Tài nguyên tĩnh (images, favicon, index.html)
-├── tests/                # Chứa các file unit test
-├── .gitignore            # Khai báo các file bỏ qua khi push lên Git
-├── package.json          # Khai báo thư viện và scripts (Node.js)
-└── README.md             # Tài liệu dự án
+├── csi-rs/                           # Thư viện thuật toán tính toán ma trận Precoding CSI-RS
+│   ├── typeI/                        # Type I Codebook (Độ phân giải không gian chuẩn, SU-MIMO)
+│   │   ├── multi-panel/              # Hỗ trợ ăng-ten đa mảng (Multi-panel antenna arrays)
+│   │   └── single-panel/             # Hỗ trợ ăng-ten đơn mảng (Single-panel antenna arrays)
+│   └── typeII/                       # Type II Codebook (Độ phân giải cao, tối ưu cho MU-MIMO)
+│       ├── enhanced-typeII/          # Rel-16+ Enhanced (Nén không gian/tần số giảm overhead)
+│       ├── port-selection/           # Type II Port Selection (Lựa chọn cổng ăng-ten để phản hồi)
+│       └── typeII/                   # Rel-15 Standard Type II Codebook
+├── customConfig/                     # Các file cấu hình tham số cho PDSCH
+├── genWaveform/                      # Module tạo dạng sóng (Waveform generation) cho 5G NR
+├── internal/                         # Các hàm tiện ích (utils) dùng chung cho toàn bộ dự án
+└── mumimoScheduling/                 # Nhóm thuật toán PSO, SOS, K-means tìm các cặp PMI trực giao
+    ├── algorithms/                   # Cài đặt chi tiết các thuật toán tối ưu (Heuristic)
+    │   ├── psoMUMIMOScheduling.m     # Thuật toán Particle Swarm Optimization (PSO)
+    │   └── sosMUMIMOScheduling.m     # Thuật toán Symbiotic Organisms Search (SOS)
+    ├── internal/                     # Các hàm phụ trợ riêng cho module Scheduling
+    ├── compareBerThroughput.m        # Script đo sự đánh đổi (trade-off) giữa MCS và SNR
+    ├── compareExecutionTime.m        # Đo thời gian chạy & số lượng User ghép cặp của SOS vs PSO
+    ├── simulateRandomMUMIMOScheduling.m # Script kiểm tra tính chính xác của thuật toán
+    ├── setupPath.m                   # Script liên kết đường dẫn (addpath) các thư mục
+    └── Readme.md                     # Tài liệu hướng dẫn sử dụng riêng cho module Scheduling
+├── pdsch/                            # Chứ các file xử lý kênh pdsch: CRC attach, Segmentation, Modulation, ...
+├── test/                             # Folder chứa các file thực hiện Unit Test
+└── Readme.md                         # Overview hướng dẫn cho dự án    
 ```
