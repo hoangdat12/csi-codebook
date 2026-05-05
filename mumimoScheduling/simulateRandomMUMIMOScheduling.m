@@ -33,7 +33,7 @@ setupPath();
 % ----------------------------------------------------------------------------
 nLayers = 4;
 numberOfUeToGroup = 2;
-numberOfUE = 20000;
+numberOfUE = 1000;
 
 config.CodeBookConfig.N1 = 4;
 config.CodeBookConfig.N2 = 4;

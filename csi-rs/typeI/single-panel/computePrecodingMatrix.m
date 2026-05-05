@@ -69,7 +69,7 @@ actualPorts = arrayfun(@(c) 2 * c.N1 * c.N2, all_cases);
 cases = all_cases(actualPorts <= numberOfPorts);
 
 % Loop from 1 to 4 layers
-for nLayers = 4:numberOfLayers
+for nLayers = 1:numberOfLayers
     % Create Precoding Matrix Lists
     W = struct();
 
