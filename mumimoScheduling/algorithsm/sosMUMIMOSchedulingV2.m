@@ -1,145 +1,111 @@
 function [bestGroups, bestScore] = sosMUMIMOSchedulingV2(W_all, groupSize, maxIter)
-    % =========================================================================
-    % SOS MU-MIMO SCHEDULING (SUPER FAST VERSION - RANDOM KEY)
-    % Bản tối ưu hóa: Tránh cấp phát lại bộ nhớ, dùng hoán vị mảng liên tục.
-    % =========================================================================
-    
-    % Lấy số lượng UE trong Cell
+    % Get number of UE in the Cell
     NUE = size(W_all, 3);
     
-    % Kích thước quần thể (Số lượng sinh vật)
+    % Size of each group
     popSize = 30; 
 
-    % Tổng số nhóm MU-MIMO có thể tạo ra
+    % The total number of groups
     numGroups = floor(NUE / groupSize);
     
-    % =========================================================================
-    % BƯỚC 1: TÍNH TOÁN TRƯỚC MA TRẬN KHOẢNG CÁCH (LOOKUP TABLE ONLINE)
-    % =========================================================================
-    disp('      [SOS-Fast] Computing symmetric distance matrix...');
-    distMat = zeros(NUE, NUE);
-    for i = 1:NUE-1
-        for j = i+1:NUE
-            % Sử dụng hàm chordalDistance có sẵn trong thư mục của bro
-            distMat(i, j) = chordalDistance(W_all(:,:,i), W_all(:,:,j));
-            distMat(j, i) = distMat(i, j); 
-        end
-    end
-    
-    % =========================================================================
-    % BƯỚC 2: KHỞI TẠO QUẦN THỂ LIÊN TỤC (RANDOM KEY)
-    % Thay vì dùng mảng thứ tự [1, 2, 3], ta dùng số thập phân [0.2, 0.9, 0.1]
-    % =========================================================================
-    population = rand(popSize, NUE);
-    fitness = zeros(popSize, 1);
-    perms = zeros(popSize, NUE); % Mảng lưu trữ hoán vị thực tế (Discrete)
-    
-    % Tính Fitness ban đầu cho toàn bộ quần thể
+    % Initialize the population: Each organism is a random permutation of UE indices
+    population = zeros(popSize, NUE);
     for p = 1:popSize
-        [fitness(p), perms(p,:)] = fastFitness(population(p,:), distMat, groupSize, numGroups);
+        population(p, :) = randperm(NUE);
     end
     
-    % Tìm cá thể tốt nhất ban đầu
+    % =========================================================================
+    % KHÔNG TÍNH TOÁN TRƯỚC DISTMAT Ở ĐÂY NỮA
+    % =========================================================================
+    
+    % Initialize the function handle for fitness evaluation
+    % TRUYỀN TRỰC TIẾP W_all VÀO HÀM FITNESS
+    fitnessFunc = @(perm) computeScheduleFitnessOnTheFly(perm, W_all, groupSize, numGroups);
+    
+    fitness = zeros(popSize, 1);
+    for p = 1:popSize
+        fitness(p) = fitnessFunc(population(p, :));
+    end
+    
+    % Identify the initial best organism
     [bestScore, bestIdx] = max(fitness);
-    bestPop = population(bestIdx, :);
-    bestPerm = perms(bestIdx, :);
+    bestPerm = population(bestIdx, :);
     
     no_improve_counter = 0;
-    max_no_improve = 15; % Dừng sớm nếu sau 15 thế hệ không có tiến triển
+    % Early stopping condition: No improvement after 15 iterations
+    max_no_improve = 15; 
     
-    disp('      [SOS-Fast] Starting Matrix-based evolutionary generations...');
-    
-    % =========================================================================
-    % BƯỚC 3: VÒNG LẶP TIẾN HÓA (CHỈ DÙNG TOÁN HỌC MA TRẬN, KHÔNG VÒNG LẶP FOR)
-    % =========================================================================
+    disp('      [SOS No-Prebuild] Starting evolutionary generations...');
     for iter = 1:maxIter        
+        % ===== MUTUALISM PHASE =====
         for i = 1:popSize
-            
-            % -----------------------------------------------------------------
-            % GIAI ĐOẠN 1: MUTUALISM (CỘNG SINH)
-            % -----------------------------------------------------------------
-            j = randi(popSize); 
+            j = randi(popSize);
             while j == i, j = randi(popSize); end
             
-            % Vector trung bình (Mutual Vector)
-            MV = (population(i,:) + population(j,:)) / 2;
-            BF1 = randi([1, 2]); 
-            BF2 = randi([1, 2]);
+            % Crossover between organism i and j
+            newOrgI = mutualismSwap(population(i,:), population(j,:));
+            newOrgJ = mutualismSwap(population(j,:), population(i,:));
             
-            % Cập nhật bằng phép toán ma trận siêu tốc (Vectorized)
-            newOrgI = population(i,:) + rand(1, NUE) .* (bestPop - BF1 * MV);
-            newOrgJ = population(j,:) + rand(1, NUE) .* (bestPop - BF2 * MV);
-            
-            % Ép các giá trị về lại khoảng [0,1] (Kỹ thuật bọc vòng - Wrap around)
-            newOrgI = mod(newOrgI, 1);
-            newOrgJ = mod(newOrgJ, 1);
-            
-            % Đánh giá I
-            [fI, pI] = fastFitness(newOrgI, distMat, groupSize, numGroups);
+            % Update if the new organism has a higher score
+            fI = fitnessFunc(newOrgI);
             if fI > fitness(i)
-                population(i,:) = newOrgI; fitness(i) = fI; perms(i,:) = pI;
+                population(i,:) = newOrgI;
+                fitness(i) = fI;
             end
             
-            % Đánh giá J
-            [fJ, pJ] = fastFitness(newOrgJ, distMat, groupSize, numGroups);
+            fJ = fitnessFunc(newOrgJ);
             if fJ > fitness(j)
-                population(j,:) = newOrgJ; fitness(j) = fJ; perms(j,:) = pJ;
-            end
-            
-            % -----------------------------------------------------------------
-            % GIAI ĐOẠN 2: COMMENSALISM (HỘI SINH)
-            % -----------------------------------------------------------------
-            j = randi(popSize); 
-            while j == i, j = randi(popSize); end
-            
-            % Toán tử hội sinh
-            newOrgI = population(i,:) + (rand(1, NUE)*2 - 1) .* (bestPop - population(j,:));
-            newOrgI = mod(newOrgI, 1);
-            
-            [fNew, pNew] = fastFitness(newOrgI, distMat, groupSize, numGroups);
-            if fNew > fitness(i)
-                population(i,:) = newOrgI; fitness(i) = fNew; perms(i,:) = pNew;
-            end
-            
-            % -----------------------------------------------------------------
-            % GIAI ĐOẠN 3: PARASITISM (KÝ SINH)
-            % -----------------------------------------------------------------
-            host = randi(popSize); 
-            while host == i, host = randi(popSize); end
-            
-            % Ký sinh trùng: Lấy bản sao của I, đột biến ngẫu nhiên một số "Gen"
-            parasite = population(i,:);
-            modify_idx = rand(1, NUE) > 0.8; % Chọn ngẫu nhiên 20% lượng UE để hoán đổi
-            parasite(modify_idx) = rand(1, sum(modify_idx));
-            
-            [fParasite, pParasite] = fastFitness(parasite, distMat, groupSize, numGroups);
-            if fParasite > fitness(host)
-                population(host,:) = parasite; fitness(host) = fParasite; perms(host,:) = pParasite;
+                population(j,:) = newOrgJ;
+                fitness(j) = fJ;
             end
         end
         
-        % ---------------------------------------------------------------------
-        % KIỂM TRA ĐIỀU KIỆN DỪNG SỚM (EARLY STOPPING)
-        % ---------------------------------------------------------------------
+        % ===== COMMENSALISM PHASE =====
+        for i = 1:popSize
+            j = randi(popSize);
+            while j == i, j = randi(popSize); end
+            
+            % Random mutation on organism i
+            newOrg = commensalismSwap(population(i,:), population(j,:));
+            fNew = fitnessFunc(newOrg);
+            if fNew > fitness(i)
+                population(i,:) = newOrg;
+                fitness(i) = fNew;
+            end
+        end
+        
+        % ===== PARASITISM PHASE =====
+        for i = 1:popSize
+            % Perturb the internal order of a segment to create a strong mutation
+            parasite = parasitePerturb(population(i,:));
+            host = randi(popSize);
+            while host == i, host = randi(popSize); end
+            
+            % Parasite replaces the host if it has a higher fitness score
+            fParasite = fitnessFunc(parasite);
+            if fParasite > fitness(host)
+                population(host,:) = parasite;
+                fitness(host) = fParasite;
+            end
+        end
+        
+        % Check for convergence and update the global best
         [curBest, curIdx] = max(fitness);
         if curBest > bestScore
             bestScore = curBest;
-            bestPop = population(curIdx, :);
-            bestPerm = perms(curIdx, :);
+            bestPerm = population(curIdx, :);
             no_improve_counter = 0; 
         else
             no_improve_counter = no_improve_counter + 1;
         end
         
         if no_improve_counter >= max_no_improve
-            fprintf('      [SOS-Fast] Converged early at iter %d (Score: %.4f)\n', iter, bestScore);
+            fprintf('      [SOS No-Prebuild] Algorithm converged early at iteration %d (Score: %.4f)\n', iter, bestScore);
             break;
         end
     end
     
-    % =========================================================================
-    % BƯỚC 4: XUẤT KẾT QUẢ ĐÚNG ĐỊNH DẠNG CŨ CỦA BẠN (CELL ARRAY)
-    % =========================================================================
+    % Extract the UE array into cell arrays based on group size
     bestGroups = cell(numGroups, 1);
     for g = 1:numGroups
         idx = (g-1)*groupSize + 1 : g*groupSize;
@@ -148,35 +114,64 @@ function [bestGroups, bestScore] = sosMUMIMOSchedulingV2(W_all, groupSize, maxIt
 end
 
 % =========================================================================
-% LOCAL FUNCTION: VECTORIZED FITNESS CALCULATION
+% TÍNH TOÁN ON-THE-FLY FITNESS FUNCTION 
 % =========================================================================
-function [score, perm] = fastFitness(continuousOrg, distMat, groupSize, numGroups)
-    % BÍ KÍP RANDOM KEY: Lệnh sort chuyển mảng thập phân thành mảng hoán vị
-    [~, perm] = sort(continuousOrg);
+function score = computeScheduleFitnessOnTheFly(perm, W_all, groupSize, numGroups)
+    totalDist = 0;
+    numPairsPerGroup = groupSize * (groupSize - 1) / 2; % Combinations of 2 within the group size
     
-    if groupSize == 2
-        % Dành cho ghép cặp MU-MIMO tiêu chuẩn: Vectorize 100%
-        ue1 = perm(1:2:end);
-        ue2 = perm(2:2:end);
+    for g = 1:numGroups
+        idx = (g-1)*groupSize + 1 : g*groupSize;
+        ueIdx = perm(idx);
+        groupDist = 0;
         
-        % Dò Lookup Table 1 lần cho toàn bộ 500 cặp bằng lệnh sub2ind
-        linear_idx = sub2ind(size(distMat), ue1, ue2);
-        
-        % Điểm trung bình của tất cả các nhóm
-        score = sum(distMat(linear_idx)) / numGroups;
-    else
-        % Dành cho MU-MIMO > 2 UE (Fallback an toàn)
-        totalDist = 0;
-        numPairs = groupSize * (groupSize - 1) / 2;
-        for g = 1:numGroups
-            idx = (g-1)*groupSize + 1 : g*groupSize;
-            ueIdx = perm(idx);
-            for a = 1:groupSize-1
-                for b = a+1:groupSize
-                    totalDist = totalDist + distMat(ueIdx(a), ueIdx(b));
-                end
+        % Iterate through all UE pairs in a group and accumulate the orthogonal distance
+        for a = 1:groupSize-1
+            for b = a+1:groupSize
+                % THAY ĐỔI LỚN NHẤT: Gọi hàm chordalDistance trực tiếp tại đây
+                % thay vì tra cứu O(1) từ ma trận distMat
+                groupDist = groupDist + chordalDistance(W_all(:,:,ueIdx(a)), W_all(:,:,ueIdx(b)));
             end
         end
-        score = totalDist / (numGroups * numPairs);
+        
+        totalDist = totalDist + groupDist / numPairsPerGroup;
     end
+    % Return the average score across all scheduled groups
+    score = totalDist / numGroups;
+end
+
+% =========================================================================
+% MUTATION / CROSSOVER OPERATORS (Giữ nguyên)
+% =========================================================================
+function newPerm = mutualismSwap(permA, permB)
+    n = length(permA);
+    pt1 = randi(n); pt2 = randi(n);
+    while pt1 == pt2, pt2 = randi(n); end
+    if pt1 < pt2
+        idx1 = pt1; idx2 = pt2;
+    else
+        idx1 = pt2; idx2 = pt1;
+    end
+    segment = permB(idx1:idx2); 
+    isInSegment = false(1, n); 
+    isInSegment(segment) = true; 
+    remaining = permA(~isInSegment(permA));  
+    maxInsert = length(remaining) + 1; 
+    insertPos = randi(maxInsert);
+    newPerm = [remaining(1:insertPos-1), segment, remaining(insertPos:end)];
+end
+
+function newPerm = commensalismSwap(permA, ~)
+    newPerm = permA;
+    pts = randperm(length(permA), 2);
+    temp = newPerm(pts(1));
+    newPerm(pts(1)) = newPerm(pts(2));
+    newPerm(pts(2)) = temp;
+end
+
+function parasite = parasitePerturb(perm)
+    parasite = perm;
+    n = length(perm);
+    pts = sort(randperm(n, 2));
+    parasite(pts(1):pts(2)) = parasite(pts(1) + randperm(pts(2)-pts(1)+1) - 1);
 end

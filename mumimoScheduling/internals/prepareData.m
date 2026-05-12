@@ -1,4 +1,5 @@
-function [W_all, UE_Reported_Indices, totalPMI] = prepareData(config, nLayers, numberOfUE)
+function [W_all, UE_Reported_Indices, totalPMI, PMI_list, H_list] = prepareData(config, nLayers, numberOfUE)
+    SNR_dB = 20;
     % Extract codebook configuration parameters
     N1     = config.CodeBookConfig.N1;
     N2     = config.CodeBookConfig.N2;
@@ -36,17 +37,45 @@ function [W_all, UE_Reported_Indices, totalPMI] = prepareData(config, nLayers, n
     fclose(fid);
 
     fprintf('Successfully loaded %d precoding matrices from file.\n', pmi_in_file);
+    totalPMI = pmi_in_file;
 
-    % Randomly sample numberOfUE matrices with replacement.
-    % Example: if the file contains 128 matrices, rand_idx holds
-    % numberOfUE random integers in [1, 128].
-    fprintf('Sampling %d random precoding matrices from pool...\n', numberOfUE);
-    rand_idx = randi(pmi_in_file, 1, numberOfUE);
+    % -------------------------------------------------------------------------
+    % Sinh numberOfUE kênh H ngẫu nhiên Rayleigh [Nr x nPort]
+    % Với mỗi H tìm PMI tốt nhất: PMI = argmax_i ||H * W_i||^2_F
+    % SNR không ảnh hưởng argmax với Type I nhưng truyền vào để mở rộng sau
+    % -------------------------------------------------------------------------
+    fprintf('Generating %d Rayleigh H [%d x %d], SNR = %d dB...\n', ...
+        numberOfUE, nLayers, nPort, SNR_dB);
 
-    % Vectorized extraction
-    W_all               = W_pool(:, :, rand_idx);
-    UE_Reported_Indices = pool_info(rand_idx);
-    totalPMI            = pmi_in_file;
+    H_list            = zeros(nLayers, nPort, numberOfUE);
+    PMI_list          = zeros(numberOfUE, 1);       % 0-indexed
+    best_idx_list     = zeros(numberOfUE, 1);       % 1-indexed (dùng nội bộ)
 
-    fprintf('Done. W_all: [%d x %d x %d]\n\n', size(W_all, 1), size(W_all, 2), size(W_all, 3));
+    for k = 1:numberOfUE
+        % Sinh H theo Rayleigh fading
+        H_k = (randn(nLayers, nPort) + 1j*randn(nLayers, nPort)) / sqrt(2);
+        H_list(:, :, k) = H_k;
+
+        % Tìm PMI tốt nhất
+        best_val = -inf;
+        best_idx = 1;
+        for i = 1:totalPMI
+            val = norm(H_k * W_pool(:, :, i), 'fro')^2;
+            if val > best_val
+                best_val = val;
+                best_idx = i;
+            end
+        end
+
+        PMI_list(k)      = best_idx - 1;   % 0-indexed
+        best_idx_list(k) = best_idx;       % 1-indexed để index vào pool
+    end
+
+    fprintf('PMI search done. Extracting W and info...\n');
+
+    % Vectorized extraction theo best_idx tìm được
+    W_all               = W_pool(:, :, best_idx_list);
+    UE_Reported_Indices = pool_info(best_idx_list);
+
+    fprintf('Done. W_all: [%d x %d x %d]\n\n', size(W_all,1), size(W_all,2), size(W_all,3));
 end
