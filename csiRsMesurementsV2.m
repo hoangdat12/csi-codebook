@@ -1,11 +1,7 @@
-%% Full CSI Report — Type I Single Panel | 32 ports | 273 RB | 30kHz
-%  Dùng nrPerfectChannelEstimate + CDL thay TDL để tránh lỗi RAM
-%  Yêu cầu: 5G Toolbox (MathWorks)
-
+%% CSI Report — 32 port | 273 RB | 30kHz | TDL-C | Type I Single Panel
 clc; clear; close all;
-addpath('D:\Programs\Matlab\R2025a\toolbox\5g\5g');
 
-%% ========== 1. CARRIER ==========
+%% 1. CARRIER
 carrier = nrCarrierConfig;
 carrier.SubcarrierSpacing = 30;
 carrier.NSizeGrid         = 273;
@@ -13,10 +9,7 @@ carrier.NStartGrid        = 0;
 carrier.NSlot             = 0;
 carrier.NFrame            = 0;
 
-fprintf('=== Carrier: SCS=%dkHz | Grid=%d RBs ===\n\n', ...
-    carrier.SubcarrierSpacing, carrier.NSizeGrid);
-
-%% ========== 2. CSI-RS ==========
+%% 2. CSI-RS — 32 port, Row 18
 csirs = nrCSIRSConfig;
 csirs.CSIRSType           = {'nzp', 'nzp'};
 csirs.RowNumber           = [18 18];
@@ -28,129 +21,179 @@ csirs.RBOffset            = 0;
 csirs.CSIRSPeriod         = [4 0];
 
 nTxAnts = max(csirs.NumCSIRSPorts);  % 32
-nRxAnts = 32;
+nRxAnts = 4;  % 4 Rx anten (= max layer muốn đo)
 
 fprintf('=== CSI-RS: Tx=%d | Rx=%d ===\n\n', nTxAnts, nRxAnts);
 
-%% ========== 3. REPORT CONFIG ==========
+%% 3. REPORT CONFIG
 reportConfig = nrCSIReportConfig;
 reportConfig.NStartBWP               = 0;
 reportConfig.NSizeBWP                = 273;
 reportConfig.CodebookType            = 'Type1SinglePanel';
-reportConfig.PanelDimensions         = [1 4 4];
+reportConfig.PanelDimensions         = [1 4 4];    % N1=4, N2=4 → 32 port
 reportConfig.CodebookMode            = 1;
-reportConfig.CQITable                = 'table1';
-reportConfig.CQIFormatIndicator      = 'Subband';
-reportConfig.SubbandSize             = 4;
-reportConfig.PMIFormatIndicator      = 'Subband';
+reportConfig.CQITable                = 'Table2';
+reportConfig.CQIFormatIndicator      = 'Wideband';
+reportConfig.SubbandSize             = 32;
+reportConfig.PMIFormatIndicator      = 'Wideband';
+reportConfig.RIRestriction           = [];
 reportConfig.CodebookSubsetRestriction = [];
+reportConfig.RIRestriction = [0 0 0 1 0 0 0 0];
 
-fprintf('=== Report: %s | Panel[N1=%d N2=%d] | BWP=%d RBs ===\n\n', ...
-    reportConfig.CodebookType, ...
-    reportConfig.PanelDimensions(1), reportConfig.PanelDimensions(2), ...
-    reportConfig.NSizeBWP);
+%% 4. PDSCH DMRS
+pdsch = nrPDSCHConfig;
 
-%% ========== 4. CDL CHANNEL ==========
-% Dùng CDL thay TDL — CDL không cần gen waveform dài như TDL
-channel = nrCDLChannel;
-channel.DelayProfile        = 'CDL-C';
+%% 5. TẠO CSI-RS VÀ MAP VÀO GRID
+csirsInd = nrCSIRSIndices(carrier, csirs);
+csirsSym = nrCSIRS(carrier, csirs);
+
+txGrid           = nrResourceGrid(carrier, nTxAnts);
+txGrid(csirsInd) = csirsSym;
+
+%% 6. OFDM MODULATE
+OFDMInfo   = nrOFDMInfo(carrier);
+txWaveform = nrOFDMModulate(carrier, txGrid);
+
+fprintf('=== OFDM: Nfft=%d | SampleRate=%.2f MHz ===\n\n', ...
+    OFDMInfo.Nfft, OFDMInfo.SampleRate/1e6);
+
+%% 7. TDL CHANNEL
+channel = nrTDLChannel;
+channel.NumTransmitAntennas = nTxAnts;   % 32
+channel.NumReceiveAntennas  = nRxAnts;   % 4
+channel.SampleRate          = OFDMInfo.SampleRate;
+channel.DelayProfile        = 'TDL-C';
 channel.DelaySpread         = 300e-9;
 channel.MaximumDopplerShift = 5;
-channel.TransmitAntennaArray.Size = [32 1 1 1 1];  % [M N P Mg Ng]
-channel.ReceiveAntennaArray.Size  = [32 1 1 1 1];
 channel.Seed                = 42;
-channel.NormalizePathGains  = true;
 
-OFDMInfo = nrOFDMInfo(carrier);
+chInfo     = info(channel);
+maxChDelay = ceil(max(chInfo.PathDelays * OFDMInfo.SampleRate)) ...
+             + chInfo.ChannelFilterDelay;
 
-%% ========== 5. PDSCH DMRS ==========
-pdsch      = nrPDSCHConfig;
-dmrsConfig = pdsch.DMRS;
+%% 8. QUA KÊNH
+rxWaveform = channel([txWaveform; zeros(maxChDelay, nTxAnts)]);
 
-%% ========== 6. HÀM PERFECT CHANNEL ESTIMATE ==========
-% Tránh cấp phát waveform lớn — lấy path gains từ 1 slot nhỏ
-getH = @(ch, snrDb) localPerfectEst(carrier, ch, snrDb);
+%% 9. TIMING SYNC
+offset     = nrTimingEstimate(carrier, rxWaveform, csirsInd, csirsSym);
+rxWaveform = rxWaveform(1+offset:end, :);
 
-%% ========== 7. SINGLE POINT SNR=20dB ==========
+%% 10. THÊM AWGN
 SNRdB = 20;
-fprintf('=== Single Point SNR=%ddB ===\n', SNRdB);
+SNR   = 10^(SNRdB/10);
+sigma = 1 / sqrt(2.0 * nRxAnts * double(OFDMInfo.Nfft) * SNR);
+rng('default');
+noise      = sigma * complex(randn(size(rxWaveform)), randn(size(rxWaveform)));
+rxWaveform = rxWaveform + noise;
 
-[H, nVar] = getH(channel, SNRdB);
-fprintf('H size: [%s] | nVar=%.2e\n\n', num2str(size(H)), nVar);
+%% 11. OFDM DEMODULATE
+rxGrid = nrOFDMDemodulate(carrier, rxWaveform);
 
-[CSIReport, CSIInfo] = nrCSIReportCSIRS( ...
-    carrier, csirs, reportConfig, dmrsConfig, H, nVar);
+%% 12. CHANNEL ESTIMATE
+% CDMLengths=[2 1]: FD-CDM2 cho Row 18
+[H, nVar] = nrChannelEstimate(rxGrid, csirsInd, csirsSym, 'CDMLengths', [2 1]);
 
-fprintf('[RI]  = %d\n', CSIReport.RI);
-fprintf('[i1]  = [%s]\n', num2str(CSIReport.PMISet.i1));
-fprintf('[i2]  = [%s]\n', num2str(CSIReport.PMISet.i2(:)'));
-fprintf('[CQI] Wideband = %d\n', CSIReport.CQI(1,1));
-fprintf('[W]   size = [%s]\n\n', num2str(size(CSIInfo.W)));
+fprintf('H size : [%s]\n', num2str(size(H)));
+fprintf('nVar   : %.4e\n\n', nVar);
 
-%% ========== 8. SWEEP SNR ==========
-fprintf('=== Sweep SNR ===\n');
-fprintf('%-10s %-5s %-10s\n', 'SNR(dB)', 'RI', 'WB_CQI');
-fprintf('%s\n', repmat('-',1,28));
+%% 13. CSI REPORT
+[CSIReport, CSIInfo] = nrCSIReportCSIRS(carrier, csirs, reportConfig, pdsch.DMRS, H, nVar);
 
-SNRdB_range = -5:5:30;
-CQI_wb = NaN(1, length(SNRdB_range));
-RI_arr = NaN(1, length(SNRdB_range));
+%% 14. KẾT QUẢ
+fprintf('===== CSI Report =====\n');
+fprintf('RI           : %d\n',      CSIReport.RI);
+fprintf('CQI wideband : %d\n',      CSIReport.CQI(1,1));
+fprintf('PMI i1       : [%s]\n',    num2str(CSIReport.PMISet.i1));
+fprintf('PMI i2 size  : [%s]\n',    num2str(size(CSIReport.PMISet.i2)));
+fprintf('Eff. SINR    : %.2f dB\n', 10*log10(CSIInfo.EffectiveSINR));
+fprintf('W size       : [%s]\n',    num2str(size(CSIInfo.W)));
 
-for idx = 1:length(SNRdB_range)
-    release(channel);
-    channel.Seed = idx;
 
-    try
-        [H_i, nVar_i] = getH(channel, SNRdB_range(idx));
-        [CSI_i, ~]    = nrCSIReportCSIRS( ...
-            carrier, csirs, reportConfig, dmrsConfig, H_i, nVar_i);
-        CQI_wb(idx) = CSI_i.CQI(1,1);
-        RI_arr(idx) = CSI_i.RI;
-    catch ME
-        fprintf('SNR=%ddB: %s\n', SNRdB_range(idx), ME.message);
+%% Tra PMI index từ CSI Report output
+% CSIReport.PMISet.i1 = [i11, i12, i13]  (1-based từ MATLAB)
+% CSIReport.PMISet.i2 = [i2_sb1, i2_sb2, ...]  (1-based, mỗi subband 1 giá trị)
+
+%% Tra PMI index từ CSI Report output
+% MATLAB dùng 1-based → convert sang 0-based để tra file
+i11 = CSIReport.PMISet.i1(1) - 1;
+i12 = CSIReport.PMISet.i1(2) - 1;
+i13 = CSIReport.PMISet.i1(3) - 1;
+i2_sb = CSIReport.PMISet.i2 - 1;  % [1 x numSubbands], 0-based
+
+% Tính PMI_Index tuyến tính
+% Với N1=4, N2=4, O1=4, O2=4:
+%   i11 ∈ [0..7]   (O1*N1 - 1 = 7)
+%   i12 ∈ [0..15]  (O2*N2 - 1 = 15)
+%   i13 ∈ [0..3]   (4 giá trị)
+%   i2  ∈ [0..1]   (2 giá trị, CodebookMode=1, rank 4)
+N_i12 = 16;  % O2*N2
+N_i13 = 4;
+N_i2  = 2;
+
+pmi_index_wideband = i11*(N_i12*N_i13*N_i2) + i12*(N_i13*N_i2) + i13*N_i2 + i2_sb(1);
+
+fprintf('i11=%d, i12=%d, i13=%d\n', i11, i12, i13);
+fprintf('i2 per subband (0-based): [%s]\n', num2str(i2_sb));
+fprintf('PMI_Index (wideband, 0-based) = %d\n', pmi_index_wideband);
+
+%% Đọc W matrix từ file
+fid = fopen('Layer4_Port32_N1_4_N2-4_c1.txt', 'r');
+if fid == -1
+    error('Không mở được file codebook');
+end
+lines = textscan(fid, '%s', 'Delimiter', '\n');
+lines = lines{1};
+fclose(fid);
+
+%% Tìm header dòng tương ứng PMI_Index
+target_str  = sprintf('PMI_Index: %d,', pmi_index_wideband);
+header_line = find(contains(lines, target_str), 1);
+
+if isempty(header_line)
+    fprintf('Không tìm thấy PMI_Index=%d trong file\n', pmi_index_wideband);
+else
+    fprintf('\nTìm thấy tại dòng %d: %s\n', header_line, lines{header_line});
+
+    %% Đọc 32 dòng tiếp theo = W matrix [32 port x 4 layer]
+    nPort   = 32;
+    nLayers = 4;
+    W_lookup = zeros(nPort, nLayers);
+
+    for row = 1:nPort
+        lineStr = strtrim(lines{header_line + row});
+
+        % FIX: dùng regex thay sscanf để parse đúng "a+bi" và "a-bi"
+        matches = regexp(lineStr, '[-+]?\d+\.\d+[+-]\d+\.\d+i', 'match');
+
+        if numel(matches) < nLayers
+            fprintf('Warning: dòng %d parse được %d số (cần %d)\n', ...
+                header_line+row, numel(matches), nLayers);
+            continue;
+        end
+
+        for col = 1:nLayers
+            W_lookup(row, col) = str2double(matches{col});
+        end
     end
 
-    fprintf('%-10d %-5d %-10d\n', SNRdB_range(idx), RI_arr(idx), CQI_wb(idx));
-end
+    fprintf('\nW_lookup (32x4) — 4 hàng đầu:\n');
+    disp(W_lookup(1:4, :));
 
-%% ========== 9. VẼ ĐỒ THỊ ==========
-figure('Name','CSI 32-port 273RB','Position',[100 100 950 420]);
+    %% So sánh W_lookup với W từ CSI report
+    W_csi = CSIInfo.W;  % [32 x 4]
+    fprintf('W từ nrCSIReportCSIRS size : [%s]\n', num2str(size(W_csi)));
+    fprintf('W từ file lookup      size : [%s]\n', num2str(size(W_lookup)));
 
-subplot(1,2,1);
-plot(SNRdB_range, CQI_wb,'b-o','LineWidth',2,'MarkerSize',7,'MarkerFaceColor','b');
-grid on; xlabel('SNR (dB)'); ylabel('Wideband CQI');
-title('Wideband CQI vs SNR'); ylim([0 16]); yticks(0:15);
+    % Tính sai số Frobenius (chuẩn hóa theo phase)
+    % W có thể lệch pha toàn cục → dùng abs để so sánh biên độ
+    diff_abs = norm(abs(W_csi) - abs(W_lookup), 'fro');
+    fprintf('||abs(W_csi) - abs(W_lookup)||_F = %.6f\n', diff_abs);
 
-subplot(1,2,2);
-plot(SNRdB_range, RI_arr,'r-s','LineWidth',2,'MarkerSize',7,'MarkerFaceColor','r');
-grid on; xlabel('SNR (dB)'); ylabel('Rank Indicator');
-title('RI vs SNR'); ylim([0 9]); yticks(1:8);
-
-sgtitle('Type I Single Panel | 32-port | N1=4,N2=4 | 273RB | SCS=30kHz | CDL-C');
-
-fprintf('\nHoàn tất!\n');
-
-%% ========== LOCAL FUNCTION ==========
-function [H, nVar] = localPerfectEst(carrier, channel, SNRdB)
-    % Lấy path gains bằng waveform tối thiểu (1 symbol, 1 slot)
-    % Không cấp phát waveform lớn
-    OFDMInfo = nrOFDMInfo(carrier);
-    nTx      = channel.NumTransmitAntennas;
-    Nfft     = OFDMInfo.Nfft;
-    cpLen    = OFDMInfo.CyclicPrefixLengths(1);
-    nSym     = carrier.SymbolsPerSlot;
-    nSamples = (Nfft + cpLen) * nSym;   % 1 slot, ít samples nhất
-
-    % Qua kênh với tín hiệu zeros để lấy path gains
-    txSig = zeros(nSamples, nTx);
-    [~, pathGains, sampleTimes] = channel(txSig);
-
-    % Perfect channel estimate — không cần OFDM modulate/demodulate
-    H = nrPerfectChannelEstimate(carrier, pathGains, ...
-        channel.PathDelays, sampleTimes);
-
-    % Noise variance từ SNR (normalized)
-    nVar = 1 / (10^(SNRdB/10));
+    if diff_abs < 1e-4
+        fprintf('✓ W khớp với codebook file\n');
+    else
+        fprintf('✗ W KHÔNG khớp — kiểm tra lại công thức PMI_Index\n');
+    end
 end
 
 function [CSIReport,CSIInfo] = nrCSIReportCSIRS(carrier,csirs,reportConfig,dmrsConfig,H,nVar)

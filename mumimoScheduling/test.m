@@ -96,24 +96,3 @@ for k = 1:numberOfUE
         k, PMI_best(k), norm_best(k), eff_SNR_best(k), ...
         pool_info{PMI_best(k) + 1});
 end
-
-% ----------------------------------------------------------------------------
-% Bước 5: Thống kê
-% ----------------------------------------------------------------------------
-fprintf('\nSNR = %d dB | Mean ||HW||^2_F = %.4f | Mean Eff SNR = %.4f (%.2f dB)\n', ...
-    SNR_dB, mean(norm_best), mean(eff_SNR_best), ...
-    10*log10(mean(eff_SNR_best)));
-
-pmi_counts = histcounts(PMI_best, -0.5:1:totalPMI-0.5);
-
-figure('Name', 'PMI Distribution');
-bar(0:totalPMI-1, pmi_counts, 'FaceColor', [0.2 0.6 0.9], 'EdgeColor', 'white');
-xlabel('PMI Index'); ylabel('Count');
-title(sprintf('Type I PMI distribution — %d UE, SNR = %d dB', numberOfUE, SNR_dB));
-grid on;
-
-figure('Name', 'Effective SNR per UE');
-plot(1:numberOfUE, 10*log10(eff_SNR_best), '.', ...
-    'Color', [0.2 0.6 0.9], 'MarkerSize', 4);
-xlabel('UE index'); ylabel('Effective SNR (dB)');
-title('Effective SNR after Type I beamforming'); grid on;
