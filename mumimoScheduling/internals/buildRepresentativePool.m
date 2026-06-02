@@ -1,50 +1,51 @@
 function [W_pool, pool_indices, pool_pmi] = buildRepresentativePool(W_all, UE_Reported_Indices, config)
-    % Parse config fields with defaults
-    if isfield(config, 'numClusters'),    numClusters    = config.numClusters;
-    else,                                 numClusters    = 50;
-    end
-    if isfield(config, 'targetPoolSize'), targetPoolSize = config.targetPoolSize;
-    else,                                 targetPoolSize = 200;
-    end
-    if isfield(config, 'kmeansMaxIter'),  kmeansMaxIter  = config.kmeansMaxIter;
-    else,                                 kmeansMaxIter  = 100;
-    end
 
-    [Num_Antennas, NumLayers, Num_UEs] = size(W_all);
+    numClusters    = getField(config, 'numClusters',    50);
+    targetPoolSize = getField(config, 'targetPoolSize', 200);
+    kmeansMaxIter  = getField(config, 'kmeansMaxIter',  100);
+    showPlots      = getField(config, 'showPlots',      true); % Thêm cờ để bật/tắt vẽ hình
 
-    % Clamp numClusters to actual pool size to avoid K-means errors
-    if numClusters > Num_UEs
-        fprintf('Warning: numClusters (%d) exceeds number of matrices (%d). Clamping to %d.\n', ...
-                numClusters, Num_UEs, Num_UEs);
-        numClusters = Num_UEs;
+    [Nt, ~, N] = size(W_all);
+    numClusters = min(numClusters, N);
+
+    % Feature: flatten projection matrix P = Q*Q'
+    P_features = zeros(N, Nt^2);
+    for k = 1:N
+        Q = orth(W_all(:,:,k));
+        P = real(Q * Q');
+        P_features(k,:) = P(:).';
     end
 
-    % Flatten W_all to real-valued feature matrix for K-means:
-    %   W_all [nAnt x nLayers x nUE] -> W_features [nUE x 2*nAnt*nLayers]
-    W_flat     = reshape(W_all, Num_Antennas * NumLayers, Num_UEs).';
-    W_features = [real(W_flat), imag(W_flat)];
+    % K-Means trên P_features
+    [labels, ~] = kmeans(P_features, numClusters, ...
+        'Distance',   'sqeuclidean', ...
+        'MaxIter',    kmeansMaxIter,  ...
+        'Replicates', 3);
 
-    fprintf('Running K-means (%d clusters) on %d matrices...\n', numClusters, Num_UEs);
-
-    % Cluster UEs by spatial signature using cosine distance
-    [cluster_idx, ~] = kmeans(W_features, numClusters, ...
-                              'Distance', 'cosine',    ...
-                              'MaxIter',  kmeansMaxIter);
-
-    % Draw a fixed quota of UEs from each cluster to form the representative pool
+    % Lấy đại diện gần centroid nhất (thay vì random)
     ues_per_cluster = ceil(targetPoolSize / numClusters);
     pool_indices    = [];
 
     for c = 1:numClusters
-        members      = find(cluster_idx == c);
-        members      = members(randperm(length(members))); % random shuffle
+        members = find(labels == c);
+        if isempty(members), continue; end
+
+        % Centroid của cụm c trong feature space
+        centroid = mean(P_features(members, :), 1);
+
+        % Khoảng cách Euclidean đến centroid
+        diffs = P_features(members, :) - centroid;
+        d2    = sum(diffs.^2, 2);
+        [~, ord] = sort(d2, 'ascend');
+
         num_to_pick  = min(ues_per_cluster, length(members));
-        pool_indices = [pool_indices; members(1:num_to_pick)];
+        pool_indices = [pool_indices; members(ord(1:num_to_pick))];
     end
 
     W_pool   = W_all(:, :, pool_indices);
     pool_pmi = UE_Reported_Indices(pool_indices);
+end
 
-    fprintf('Representative pool built: %d matrices from %d clusters (target: %d).\n\n', ...
-            length(pool_indices), numClusters, targetPoolSize);
+function v = getField(s, f, default)
+    if isfield(s, f), v = s.(f); else, v = default; end
 end

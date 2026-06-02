@@ -107,8 +107,8 @@ W2 = [
 % ----------------------------------------------------------------------------
 % The configuration parameters for the test
 % ----------------------------------------------------------------------------
-SNR_dBs  = 0:5:30;
-MCS_list = [0, 5, 11, 27];
+SNR_dBs  = 10:5:25;
+MCS_list = 27;
 
 % Initialize result matrices
 ber1_results    = zeros(length(MCS_list), length(SNR_dBs));
@@ -149,20 +149,25 @@ mu = log2(baseConfig.SUBCARRIER_SPACING / 15);
 % Sweep through MCS and SNR
 % ----------------------------------------------------------------------------
 fprintf('--- BER AND THROUGHPUT SIMULATION ACROSS MCS AND SNR ---\n');
+% Khai báo băng thông (100 MHz)
+BW_Hz = 100e6; 
 
 for m = 1:length(MCS_list)
     current_mcs    = MCS_list(m);
     baseConfig.MCS = current_mcs;
     pdsch          = pdsch.setMCS(current_mcs);
 
-    % Peak throughput for a single UE (K=1)
+    % Peak throughput cho 1 UE (K=1) tính bằng Mbps
     [max_tp_UE, ~] = calculateThroughput(pdsch, mu, 1);
+    
+    % CHUYỂN ĐỔI: Peak Throughput (Mbps) -> Peak Spectral Efficiency (bps/Hz)
+    max_se_UE = (max_tp_UE * 1e6) / BW_Hz;
 
-    % TBS used to estimate BLER from BER
+    % TBS dùng để ước tính BLER từ BER
     TBS = manualCalculateTBS(pdsch);
 
-    fprintf('MCS=%d | Modulation=%s | CodeRate=%.4f | Max TP/UE=%.2f Mbps\n', ...
-            current_mcs, pdsch.Modulation, pdsch.TargetCodeRate, max_tp_UE);
+    fprintf('MCS=%d | Modulation=%s | CodeRate=%.4f | Max SE/UE=%.4f bps/Hz\n', ...
+            current_mcs, pdsch.Modulation, pdsch.TargetCodeRate, max_se_UE);
 
     for i = 1:length(SNR_dBs)
         SNR_dB = SNR_dBs(i);
@@ -176,19 +181,19 @@ for m = 1:length(MCS_list)
         bler1 = 1 - (1 - ber1)^TBS;
         bler2 = 1 - (1 - ber2)^TBS;
 
-        % Effective throughput per UE = peak TP * (1 - BLER)
-        tp1 = max_tp_UE * max(0, 1 - bler1);
-        tp2 = max_tp_UE * max(0, 1 - bler2);
+        % Effective Spectral Efficiency per UE = peak SE * (1 - BLER)
+        se1 = max_se_UE * max(0, 1 - bler1);
+        se2 = max_se_UE * max(0, 1 - bler2);
 
-        % Cell sum rate = sum of effective throughput across all UEs
-        sumRate = tp1 + tp2;
+        % Cell sum Spectral Efficiency = tổng SE của cả 2 UEs
+        sumSE = se1 + se2;
 
-        tp1_results(m, i)     = tp1;
-        tp2_results(m, i)     = tp2;
-        sumRate_results(m, i) = sumRate;
+        se1_results(m, i)   = se1;
+        se2_results(m, i)   = se2;
+        sumSE_results(m, i) = sumSE;
 
-        fprintf('   SNR=%2d dB | BER1=%.2e BLER1=%.4f TP1=%.2f Mbps | BER2=%.2e BLER2=%.4f TP2=%.2f Mbps | SumRate=%.2f Mbps\n', ...
-                SNR_dB, ber1, bler1, tp1, ber2, bler2, tp2, sumRate);
+        fprintf('   SNR=%2d dB | BER1=%.2e BLER1=%.4f SE1=%.4f bps/Hz | BER2=%.2e BLER2=%.4f SE2=%.4f bps/Hz | SumSE=%.4f bps/Hz\n', ...
+                SNR_dB, ber1, bler1, se1, ber2, bler2, se2, sumSE);
     end
 end
 
@@ -196,7 +201,7 @@ fprintf('--- SIMULATION COMPLETE ---\n');
 
 
 % ----------------------------------------------------------------------------
-% Plotting Results
+% Plotting Results (Đã chuyển sang Spectral Efficiency)
 % ----------------------------------------------------------------------------
 markers      = {'-o', '-s', '-d', '-^'};
 legends_cell = cell(length(MCS_list), 1);
@@ -204,8 +209,8 @@ for m = 1:length(MCS_list)
     legends_cell{m} = sprintf('MCS %d', MCS_list(m));
 end
 
-% Figure 1: BER and per-UE throughput
-figure('Name', 'BER & Throughput per UE', 'Position', [100, 100, 1000, 800]);
+% Figure 1: BER and per-UE Spectral Efficiency
+figure('Name', 'BER & Spectral Efficiency per UE', 'Position', [100, 100, 1000, 800]);
 
 % Panel 1: BER - UE 1
 subplot(2, 2, 1);
@@ -231,38 +236,38 @@ xlabel('SNR (dB)'); ylabel('BER');
 legend(legends_cell, 'Location', 'southwest');
 ylim([1e-5 1]);
 
-% Panel 3: Effective throughput - UE 1
+% Panel 3: Effective Spectral Efficiency - UE 1
 subplot(2, 2, 3);
 hold on;
 for m = 1:length(MCS_list)
-    plot(SNR_dBs, tp1_results(m, :), markers{m}, 'LineWidth', 1.5, 'MarkerSize', 6);
+    plot(SNR_dBs, se1_results(m, :), markers{m}, 'LineWidth', 1.5, 'MarkerSize', 6);
 end
 hold off; grid on;
-title('UE 1: Effective Throughput vs SNR');
-xlabel('SNR (dB)'); ylabel('Throughput (Mbps)');
+title('UE 1: Effective Spectral Efficiency vs SNR');
+xlabel('SNR (dB)'); ylabel('Spectral Efficiency (bps/Hz)');
 legend(legends_cell, 'Location', 'northwest');
 
-% Panel 4: Effective throughput - UE 2
+% Panel 4: Effective Spectral Efficiency - UE 2
 subplot(2, 2, 4);
 hold on;
 for m = 1:length(MCS_list)
-    plot(SNR_dBs, tp2_results(m, :), markers{m}, 'LineWidth', 1.5, 'MarkerSize', 6);
+    plot(SNR_dBs, se2_results(m, :), markers{m}, 'LineWidth', 1.5, 'MarkerSize', 6);
 end
 hold off; grid on;
-title('UE 2: Effective Throughput vs SNR');
-xlabel('SNR (dB)'); ylabel('Throughput (Mbps)');
+title('UE 2: Effective Spectral Efficiency vs SNR');
+xlabel('SNR (dB)'); ylabel('Spectral Efficiency (bps/Hz)');
 legend(legends_cell, 'Location', 'northwest');
 
-sgtitle('BER and Throughput Trade-off across MCS and SNR (MU-MIMO 2 UEs)');
+sgtitle('BER and Spectral Efficiency Trade-off across MCS and SNR (MU-MIMO 2 UEs)');
 
-% Figure 2: Cell sum rate
-figure('Name', 'Cell Sum Rate', 'Position', [150, 150, 600, 450]);
+% Figure 2: Cell sum Spectral Efficiency
+figure('Name', 'Cell Sum Spectral Efficiency', 'Position', [150, 150, 600, 450]);
 hold on;
 for m = 1:length(MCS_list)
-    plot(SNR_dBs, sumRate_results(m, :), markers{m}, 'LineWidth', 1.5, 'MarkerSize', 6);
+    plot(SNR_dBs, sumSE_results(m, :), markers{m}, 'LineWidth', 1.5, 'MarkerSize', 6);
 end
 hold off; grid on;
-title('Cell Sum Rate vs SNR');
-xlabel('SNR (dB)'); ylabel('Sum Rate (Mbps)');
+title('Cell Sum Spectral Efficiency vs SNR');
+xlabel('SNR (dB)'); ylabel('Sum Spectral Efficiency (bps/Hz)');
 legend(legends_cell, 'Location', 'northwest');
-sgtitle('Cell Sum Rate across MCS and SNR (MU-MIMO 2 UEs)');
+sgtitle('Cell Sum Spectral Efficiency across MCS and SNR (MU-MIMO 2 UEs)');

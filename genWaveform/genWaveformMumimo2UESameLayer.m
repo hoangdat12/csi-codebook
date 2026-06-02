@@ -37,7 +37,8 @@ function outWaveform = genWaveformMumimo2UESameLayer(baseConfig, W1, W2)
     pdsch1 = pdsch1.setMCS(baseConfig.MCS);
 
     % Phân bổ DMRS Port và Scrambling ID cho UE 1
-    pdsch1.DMRS.DMRSPortSet = 0 : nLayers - 1;
+    % pdsch1.DMRS.DMRSPortSet = 0 : nLayers - 1;
+    pdsch1.DMRS.DMRSPortSet = 0 : 4 - 1;
     pdsch1.DMRS.NSCID = 0;
 
     % =================================================================
@@ -58,7 +59,8 @@ function outWaveform = genWaveformMumimo2UESameLayer(baseConfig, W1, W2)
     pdsch2.SymbolAllocation = [baseConfig.PDSCH_START_SYMBOL, 14 - baseConfig.PDSCH_START_SYMBOL];
     pdsch2 = pdsch2.setMCS(baseConfig.MCS);
 
-    pdsch2.DMRS.DMRSPortSet = nLayers : numTxPorts - 1;
+    % pdsch2.DMRS.DMRSPortSet = nLayers : numTxPorts - 1;
+    pdsch2.DMRS.DMRSPortSet = 4:7;
     pdsch2.DMRS.NSCID = 0;
 
     % =================================================================
