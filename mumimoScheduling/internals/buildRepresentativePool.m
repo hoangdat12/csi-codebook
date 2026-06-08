@@ -3,7 +3,6 @@ function [W_pool, pool_indices, pool_pmi] = buildRepresentativePool(W_all, UE_Re
     numClusters    = getField(config, 'numClusters',    50);
     targetPoolSize = getField(config, 'targetPoolSize', 200);
     kmeansMaxIter  = getField(config, 'kmeansMaxIter',  100);
-    showPlots      = getField(config, 'showPlots',      true); % Thêm cờ để bật/tắt vẽ hình
 
     [Nt, ~, N] = size(W_all);
     numClusters = min(numClusters, N);

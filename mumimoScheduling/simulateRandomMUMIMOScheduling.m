@@ -136,30 +136,38 @@ semilogy(groupSizes(validBF), t_bf(validBF), '^-','LineWidth',2,'MarkerSize',8, 
 % Annotate OOM at K=5
 semilogy(groupSizes(k5idx), t_sos(k5idx)*2, 'rx','MarkerSize',14,'LineWidth',2.5);
 text(groupSizes(k5idx), t_sos(k5idx)*3.5, 'BF: Out of Memory', ...
-    'FontSize',8,'Color','r','HorizontalAlignment','center','FontWeight','bold');
+    'FontSize',13,'FontName','Times New Roman','Color','r', ...
+    'HorizontalAlignment','center','FontWeight','bold');
 
 % Value labels
 for gIdx = 1:length(groupSizes)
     if ~isnan(t_sos(gIdx))
         text(groupSizes(gIdx), t_sos(gIdx)*1.25, sprintf('%.2fs',t_sos(gIdx)), ...
-            'FontSize',7.5,'HorizontalAlignment','center','Color',cSOS);
+            'FontSize',13,'FontName','Times New Roman', ...
+            'HorizontalAlignment','center','Color',cSOS);
     end
     if ~isnan(t_bf(gIdx))
         text(groupSizes(gIdx), t_bf(gIdx)*0.6, sprintf('%.2fs',t_bf(gIdx)), ...
-            'FontSize',7.5,'HorizontalAlignment','center','Color',cBF);
+            'FontSize',13,'FontName','Times New Roman', ...
+            'HorizontalAlignment','center','Color',cBF);
     end
 end
 
 grid on;
-set(ax,'YMinorGrid','on','FontSize',11,'XColor','k','YColor','k', ...
-    'GridColor',[0.5 0.5 0.5],'Color','w');
+set(ax,'YMinorGrid','on','FontSize',18,'XColor','k','YColor','k', ...
+    'GridColor',[0.5 0.5 0.5],'Color','w', ...
+    'FontName','Times New Roman','LineWidth',1.2);
 xticks(groupSizes); xticklabels(xLbls);
-xlabel('Number of UEs per Group (K)','FontWeight','bold','FontSize',12,'Color','k');
-ylabel('Execution Time (s) — Log Scale','FontWeight','bold','FontSize',12,'Color','k');
-title('Execution Time: FindAll — SOS vs Brute Force', ...
-    'FontSize',13,'FontWeight','bold','Color','k');
-lg = legend({'SOS FindAll','BF FindAll (K=2..4)'},'Location','northwest','FontSize',10);
-set(lg,'TextColor','k','Color','w','EdgeColor',[0.5 0.5 0.5]);
+xlabel('Number of UEs per Group ($K$)','Interpreter','latex', ...
+    'FontName','Times New Roman','FontSize',18,'Color','k');
+ylabel('Execution Time (s) -- Log Scale','Interpreter','latex', ...
+    'FontName','Times New Roman','FontSize',18,'Color','k');
+title('Execution Time: FindAll --- SOS vs Brute Force', ...
+    'FontSize',18,'FontWeight','bold','Color','k','FontName','Times New Roman');
+lg = legend({'SOS FindAll','BF FindAll ($K$=2..4)'},'Location','northwest', ...
+    'Interpreter','latex','FontSize',18);
+set(lg,'TextColor','k','Color','w','EdgeColor',[0.5 0.5 0.5], ...
+    'FontName','Times New Roman');
 
 % ── Figure 2: Mean Score ──────────────────────────────────────────────────
 figure('Name','Fig 2: Mean Score – FindAll','Color','w','Position',figPos{2});
@@ -178,33 +186,41 @@ plot(groupSizes(validBF), sc_bf(validBF), '^-','LineWidth',2,'MarkerSize',8, ...
 % Annotate OOM at K=5
 plot(groupSizes(k5idx), sc_sos(k5idx), 'rx','MarkerSize',14,'LineWidth',2.5);
 text(groupSizes(k5idx), sc_sos(k5idx)-0.015, 'BF: Out of Memory', ...
-    'FontSize',8,'Color','r','HorizontalAlignment','center','FontWeight','bold');
+    'FontSize',13,'FontName','Times New Roman','Color','r', ...
+    'HorizontalAlignment','center','FontWeight','bold');
 
 % Value labels
 for gIdx = 1:length(groupSizes)
     if ~isnan(sc_sos(gIdx))
         text(groupSizes(gIdx), sc_sos(gIdx)+0.008, sprintf('%.4f',sc_sos(gIdx)), ...
-            'FontSize',7.5,'HorizontalAlignment','center','Color',cSOS);
+            'FontSize',13,'FontName','Times New Roman', ...
+            'HorizontalAlignment','center','Color',cSOS);
     end
     if ~isnan(sc_bf(gIdx))
         text(groupSizes(gIdx), sc_bf(gIdx)-0.010, sprintf('%.4f',sc_bf(gIdx)), ...
-            'FontSize',7.5,'HorizontalAlignment','center','Color',cBF);
+            'FontSize',13,'FontName','Times New Roman', ...
+            'HorizontalAlignment','center','Color',cBF);
     end
 end
 
 grid on;
-set(ax,'FontSize',11,'XColor','k','YColor','k','GridColor',[0.5 0.5 0.5],'Color','w');
+set(ax,'FontSize',18,'XColor','k','YColor','k','GridColor',[0.5 0.5 0.5],'Color','w', ...
+    'FontName','Times New Roman','LineWidth',1.2);
 xticks(groupSizes); xticklabels(xLbls);
 allValid = [sc_sos(~isnan(sc_sos)), sc_bf(~isnan(sc_bf))];
 if ~isempty(allValid)
     ylim([max(0, min(allValid)-0.05), min(1.05, max(allValid)+0.05)]);
 end
-xlabel('Number of UEs per Group (K)','FontWeight','bold','FontSize',12,'Color','k');
-ylabel('Mean Score (Avg Chordal Distance)','FontWeight','bold','FontSize',12,'Color','k');
-title('Mean Score: FindAll — SOS vs Brute Force', ...
-    'FontSize',13,'FontWeight','bold','Color','k');
-lg = legend({'SOS FindAll','BF FindAll (K=2..4)'},'Location','southwest','FontSize',10);
-set(lg,'TextColor','k','Color','w','EdgeColor',[0.5 0.5 0.5]);
+xlabel('Number of UEs per Group ($K$)','Interpreter','latex', ...
+    'FontName','Times New Roman','FontSize',18,'Color','k');
+ylabel('Mean Score (Avg Chordal Distance)','Interpreter','latex', ...
+    'FontName','Times New Roman','FontSize',18,'Color','k');
+title('Mean Score: FindAll --- SOS vs Brute Force', ...
+    'FontSize',18,'FontWeight','bold','Color','k','FontName','Times New Roman');
+lg = legend({'SOS FindAll','BF FindAll ($K$=2..4)'},'Location','southwest', ...
+    'Interpreter','latex','FontSize',18);
+set(lg,'TextColor','k','Color','w','EdgeColor',[0.5 0.5 0.5], ...
+    'FontName','Times New Roman');
 
 fprintf('\n[DONE] All figures generated.\n');
 

@@ -5,13 +5,13 @@
 clear; clc; close all; 
 setupPath();
 
-nLayers = 2;
+nLayers = 4;
 numberOfUeToGroup = 2;
 
 config.CodeBookConfig.N1 = 4;
-config.CodeBookConfig.N2 = 1;
+config.CodeBookConfig.N2 = 4;
 config.CodeBookConfig.cbMode = 1;
-config.FileName = "Precoding_8Port2Layer_CBModeN1N2_141.txt";
+config.FileName = "Layer4_Port32_N1_4_N2-4_c1.txt";
 
 % 3. Gọi hàm để đọc dữ liệu từ file
 % Đảm bảo file .txt đang nằm cùng thư mục với script đang chạy

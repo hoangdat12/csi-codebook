@@ -39,6 +39,7 @@ ALL_Case = [
 %    0.1768 + 0.0000i   0.0000 + 0.1768i  -0.1768 + 0.0000i   0.0000 - 0.1768i
 % ];
 
+% PMI 1
 W1 = [
     0.1768 + 0.0000i,  0.1768 + 0.0000i,  0.1768 + 0.0000i,  0.1768 + 0.0000i;
     0.1768 + 0.0000i,  0.0000 + 0.1768i,  0.1768 + 0.0000i,  0.0000 + 0.1768i;
@@ -76,3 +77,4 @@ for caseIdx = 1:length(ALL_Case)
     baseConfig = ALL_Case(caseIdx);
     outWaveforms{caseIdx} = genWaveformMumimo2UESameLayer(baseConfig, W1, W2);
 end
+
